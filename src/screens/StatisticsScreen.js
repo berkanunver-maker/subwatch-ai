@@ -25,13 +25,14 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSubscriptions } from '../contexts/SubscriptionContext';
 import { spacing, borderRadius, fontSize, fontWeight } from '../config/theme';
 
 export default function StatisticsScreen() {
   const { theme } = useTheme();
+  const { loading: subsLoading, getStatistics } = useSubscriptions();
 
   // State yönetimi
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [statistics, setStatistics] = useState({
     totalSpent: 0,
@@ -43,28 +44,14 @@ export default function StatisticsScreen() {
 
   /**
    * İstatistikleri yükle
-   * TODO: Gerçek API entegrasyonu sonrası güncellenecek
    */
-  const loadStatistics = async () => {
+  const loadStatistics = () => {
     try {
-      setLoading(true);
-
-      // Mock data (şimdilik)
-      // TODO: API call ve local storage'dan hesaplama eklenecek
-      setTimeout(() => {
-        setStatistics({
-          totalSpent: 0,
-          monthlyAverage: 0,
-          topSubscriptions: [],
-          categoryBreakdown: [],
-          savingsPotential: 0,
-        });
-        setLoading(false);
-        setRefreshing(false);
-      }, 500);
+      const stats = getStatistics();
+      setStatistics(stats);
+      setRefreshing(false);
     } catch (error) {
       console.error('İstatistikler yüklenirken hata:', error);
-      setLoading(false);
       setRefreshing(false);
     }
   };
@@ -73,8 +60,10 @@ export default function StatisticsScreen() {
    * Sayfa yüklendiğinde istatistikleri getir
    */
   useEffect(() => {
-    loadStatistics();
-  }, []);
+    if (!subsLoading) {
+      loadStatistics();
+    }
+  }, [subsLoading]);
 
   /**
    * Pull-to-refresh
@@ -88,7 +77,7 @@ export default function StatisticsScreen() {
   const styles = createStyles(theme);
 
   // Yüklenme durumu
-  if (loading) {
+  if (subsLoading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={theme.primary} />

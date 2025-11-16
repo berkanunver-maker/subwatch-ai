@@ -32,6 +32,7 @@ import { StatusBar } from 'expo-status-bar';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ENV } from './src/config/env';
 import { ThemeProvider } from './src/contexts/ThemeContext';
+import { SubscriptionProvider } from './src/contexts/SubscriptionContext';
 
 export default function App() {
   /**
@@ -56,11 +57,13 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      {/* Status Bar dinamik olarak tema ile ayarlanacak */}
-      <StatusBar style="auto" />
+      <SubscriptionProvider>
+        {/* Status Bar dinamik olarak tema ile ayarlanacak */}
+        <StatusBar style="auto" />
 
-      {/* Ana navigasyon yapısı */}
-      <AppNavigator />
+        {/* Ana navigasyon yapısı */}
+        <AppNavigator />
+      </SubscriptionProvider>
     </ThemeProvider>
   );
 }

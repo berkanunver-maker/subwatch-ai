@@ -25,13 +25,14 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSubscriptions } from '../contexts/SubscriptionContext';
 import { spacing, borderRadius, fontSize, fontWeight } from '../config/theme';
 
 export default function HomeScreen({ navigation }) {
   const { theme, isDark, toggleTheme } = useTheme();
+  const { loading: subsLoading, getStatistics } = useSubscriptions();
 
   // State yönetimi
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [statistics, setStatistics] = useState({
     totalMonthly: 0,
@@ -42,37 +43,26 @@ export default function HomeScreen({ navigation }) {
 
   /**
    * Abonelik istatistiklerini yükle
-   * TODO: Gerçek API entegrasyonu sonrası güncellenecek
    */
-  const loadStatistics = async () => {
+  const loadStatistics = () => {
     try {
-      setLoading(true);
-
-      // Mock data (şimdilik)
-      // TODO: API call eklenecek
-      setTimeout(() => {
-        setStatistics({
-          totalMonthly: 0,
-          totalYearly: 0,
-          activeCount: 0,
-          upcomingRenewals: [],
-        });
-        setLoading(false);
-        setRefreshing(false);
-      }, 500);
+      const stats = getStatistics();
+      setStatistics(stats);
+      setRefreshing(false);
     } catch (error) {
       console.error('İstatistik yüklenirken hata:', error);
-      setLoading(false);
       setRefreshing(false);
     }
   };
 
   /**
-   * Sayfa yüklendiğinde istatistikleri getir
+   * Sayfa yüklendiğinde ve subscriptions değiştiğinde istatistikleri getir
    */
   useEffect(() => {
-    loadStatistics();
-  }, []);
+    if (!subsLoading) {
+      loadStatistics();
+    }
+  }, [subsLoading]);
 
   /**
    * Pull-to-refresh
@@ -86,7 +76,7 @@ export default function HomeScreen({ navigation }) {
   const styles = createStyles(theme);
 
   // Yüklenme durumu
-  if (loading) {
+  if (subsLoading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={theme.primary} />
