@@ -21,6 +21,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
+import { useTheme } from '../contexts/ThemeContext';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -34,16 +35,18 @@ const Tab = createBottomTabNavigator();
  * Ana ekranlar arasında tab ile geçiş sağlar
  */
 function TabNavigator() {
+  const { theme } = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={{
-        // Tab bar styling
-        tabBarActiveTintColor: '#6366f1',
-        tabBarInactiveTintColor: '#9ca3af',
+        // Tab bar styling (dinamik tema)
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.textLight,
         tabBarStyle: {
-          backgroundColor: '#fff',
+          backgroundColor: theme.backgroundCard,
           borderTopWidth: 1,
-          borderTopColor: '#e5e7eb',
+          borderTopColor: theme.border,
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
@@ -52,9 +55,9 @@ function TabNavigator() {
           fontSize: 12,
           fontWeight: '600',
         },
-        // Header styling
+        // Header styling (dinamik tema)
         headerStyle: {
-          backgroundColor: '#6366f1',
+          backgroundColor: theme.primary,
         },
         headerTintColor: '#fff',
         headerTitleStyle: {

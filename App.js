@@ -31,6 +31,7 @@ import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ENV } from './src/config/env';
+import { ThemeProvider } from './src/contexts/ThemeContext';
 
 export default function App() {
   /**
@@ -54,12 +55,12 @@ export default function App() {
   }, []);
 
   return (
-    <>
-      {/* Status Bar (üst çubuk) ayarları */}
-      <StatusBar style="light" backgroundColor="#6366f1" />
+    <ThemeProvider>
+      {/* Status Bar dinamik olarak tema ile ayarlanacak */}
+      <StatusBar style="auto" />
 
       {/* Ana navigasyon yapısı */}
       <AppNavigator />
-    </>
+    </ThemeProvider>
   );
 }
