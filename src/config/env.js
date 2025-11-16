@@ -59,6 +59,18 @@ export const ENV = {
   API_KEY: getEnvVar('API_KEY', ''), // ASLA varsayılan değer verme!
 
   // ------------------------------------------------------------------------------
+  // GMAIL API ENTEGRASYONU
+  // ------------------------------------------------------------------------------
+  GOOGLE_CLIENT_ID: getEnvVar('GOOGLE_CLIENT_ID', ''), // OAuth 2.0 Client ID
+
+  GOOGLE_CLIENT_SECRET: getEnvVar('GOOGLE_CLIENT_SECRET', ''), // ASLA varsayılan değer verme!
+
+  GMAIL_API_SCOPE: getEnvVar(
+    'GMAIL_API_SCOPE',
+    'https://www.googleapis.com/auth/gmail.readonly'
+  ),
+
+  // ------------------------------------------------------------------------------
   // AI/ML SERVIS AYARLARI
   // ------------------------------------------------------------------------------
   OPENAI_API_KEY: getEnvVar('OPENAI_API_KEY', ''), // ASLA varsayılan değer verme!

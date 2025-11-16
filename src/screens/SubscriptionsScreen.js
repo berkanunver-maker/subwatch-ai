@@ -26,38 +26,22 @@ import {
   Alert,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSubscriptions } from '../contexts/SubscriptionContext';
 import { spacing, borderRadius, fontSize, fontWeight } from '../config/theme';
+import AddSubscriptionModal from '../components/AddSubscriptionModal';
 
 export default function SubscriptionsScreen({ navigation }) {
   const { theme } = useTheme();
+  const {
+    subscriptions,
+    loading,
+    deleteSubscription: removeSubscription,
+  } = useSubscriptions();
 
   // State yönetimi
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [subscriptions, setSubscriptions] = useState([]);
   const [filter, setFilter] = useState('all'); // 'all', 'active', 'inactive'
-
-  /**
-   * Abonelikleri yükle
-   * TODO: Gerçek API entegrasyonu sonrası güncellenecek
-   */
-  const loadSubscriptions = async () => {
-    try {
-      setLoading(true);
-
-      // Mock data (şimdilik boş)
-      // TODO: API call ve local storage'dan okuma eklenecek
-      setTimeout(() => {
-        setSubscriptions([]);
-        setLoading(false);
-        setRefreshing(false);
-      }, 500);
-    } catch (error) {
-      console.error('Abonelikler yüklenirken hata:', error);
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const [modalVisible, setModalVisible] = useState(false);
 
   /**
    * Abonelik sil
@@ -73,9 +57,8 @@ export default function SubscriptionsScreen({ navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              // TODO: Local storage'dan silme işlemi eklenecek
+              await removeSubscription(id);
               Alert.alert('Başarılı', 'Abonelik silindi.');
-              loadSubscriptions();
             } catch (error) {
               console.error('Abonelik silinirken hata:', error);
               Alert.alert('Hata', 'Abonelik silinirken bir hata oluştu.');
@@ -87,18 +70,12 @@ export default function SubscriptionsScreen({ navigation }) {
   };
 
   /**
-   * Sayfa yüklendiğinde abonelikleri getir
-   */
-  useEffect(() => {
-    loadSubscriptions();
-  }, []);
-
-  /**
-   * Pull-to-refresh
+   * Pull-to-refresh (veriler otomatik güncelleniyor)
    */
   const onRefresh = () => {
     setRefreshing(true);
-    loadSubscriptions();
+    // Context'ten veri geldiği için sadece refreshing state'ini güncelle
+    setTimeout(() => setRefreshing(false), 500);
   };
 
   /**
@@ -251,13 +228,16 @@ export default function SubscriptionsScreen({ navigation }) {
       {/* Yeni Abonelik Ekle Butonu */}
       <TouchableOpacity
         style={dynamicStyles.fab}
-        onPress={() => {
-          // Yeni abonelik ekleme sayfasına git
-          console.log('Yeni abonelik ekle - Form modal açılacak');
-        }}
+        onPress={() => setModalVisible(true)}
       >
         <Text style={dynamicStyles.fabText}>+</Text>
       </TouchableOpacity>
+
+      {/* Abonelik Ekleme Modal'ı */}
+      <AddSubscriptionModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+      />
     </View>
   );
 }
