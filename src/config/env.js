@@ -71,6 +71,23 @@ export const ENV = {
   ),
 
   // ------------------------------------------------------------------------------
+  // FIREBASE AUTHENTICATION & FIRESTORE
+  // ------------------------------------------------------------------------------
+  FIREBASE_API_KEY: getEnvVar('FIREBASE_API_KEY', ''),
+
+  FIREBASE_AUTH_DOMAIN: getEnvVar('FIREBASE_AUTH_DOMAIN', ''),
+
+  FIREBASE_PROJECT_ID: getEnvVar('FIREBASE_PROJECT_ID', ''),
+
+  FIREBASE_STORAGE_BUCKET: getEnvVar('FIREBASE_STORAGE_BUCKET', ''),
+
+  FIREBASE_MESSAGING_SENDER_ID: getEnvVar('FIREBASE_MESSAGING_SENDER_ID', ''),
+
+  FIREBASE_APP_ID: getEnvVar('FIREBASE_APP_ID', ''),
+
+  FIREBASE_MEASUREMENT_ID: getEnvVar('FIREBASE_MEASUREMENT_ID', ''), // İsteğe bağlı
+
+  // ------------------------------------------------------------------------------
   // AI/ML SERVIS AYARLARI
   // ------------------------------------------------------------------------------
   OPENAI_API_KEY: getEnvVar('OPENAI_API_KEY', ''), // ASLA varsayılan değer verme!

@@ -7,28 +7,42 @@
  *
  * KULLANIM:
  * Bu dosya uygulamanın tüm ekranları arasındaki geçişleri yönetir.
- * Bottom Tab Navigator kullanarak ana sayfalar arasında kolayca geçiş sağlar.
+ * - Auth Stack: Login, Register, ForgotPassword
+ * - Main Stack: Bottom Tab Navigator (Home, Subscriptions, Statistics)
+ *
+ * Kullanıcı giriş yapmamışsa Auth Stack gösterilir
+ * Giriş yapmışsa Main Stack gösterilir
  *
  * NOT:
  * React Navigation kütüphaneleri package.json'a eklenmelidir:
  * - @react-navigation/native
  * - @react-navigation/bottom-tabs
+ * - @react-navigation/stack
  * - react-native-screens
  * - react-native-safe-area-context
  * ==============================================================================
  */
 
 import React from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 
-// Screens
+// Auth Screens
+import LoginScreen from '../screens/LoginScreen';
+import RegisterScreen from '../screens/RegisterScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+
+// Main Screens
 import HomeScreen from '../screens/HomeScreen';
 import SubscriptionsScreen from '../screens/SubscriptionsScreen';
 import StatisticsScreen from '../screens/StatisticsScreen';
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
 
 /**
  * Bottom Tab Navigator
@@ -111,13 +125,68 @@ function TabNavigator() {
 }
 
 /**
+ * Auth Stack Navigator
+ * Login, Register ve ForgotPassword ekranları
+ */
+function AuthStack() {
+  const { theme } = useTheme();
+
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        cardStyle: { backgroundColor: theme.background },
+      }}
+    >
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen
+        name="ForgotPassword"
+        component={ForgotPasswordScreen}
+        options={{
+          headerShown: true,
+          title: 'Şifremi Unuttum',
+          headerStyle: {
+            backgroundColor: theme.primary,
+          },
+          headerTintColor: '#fff',
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+/**
  * Root Navigator
- * Tüm navigasyon yapısını sarmallar
+ * Auth durumuna göre AuthStack veya TabNavigator gösterir
  */
 export default function AppNavigator() {
+  const { user, initializing } = useAuth();
+  const { theme } = useTheme();
+
+  // Auth kontrolü yapılıyorsa loading göster
+  if (initializing) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <TabNavigator />
+      {user ? <TabNavigator /> : <AuthStack />}
     </NavigationContainer>
   );
 }
+
+/**
+ * Stiller
+ */
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
