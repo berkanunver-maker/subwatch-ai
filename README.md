@@ -257,6 +257,173 @@ LOG_LEVEL=debug
 
 ---
 
+## 📧 Gmail API Entegrasyonu
+
+SubWatch AI, Gmail hesabınızdaki abonelik maillerini otomatik olarak okuyabilir ve tespit edebilir. Bu özellik sayesinde Netflix, Spotify, YouTube gibi servislerin ödeme maillerini otomatik olarak bulup abonelik olarak ekleyebilirsiniz.
+
+### 📝 Kurulum Adımları
+
+#### 1. Google Cloud Console Projesi Oluşturma
+
+1. [Google Cloud Console](https://console.cloud.google.com)'a gidin
+2. Yeni bir proje oluşturun:
+   - Sol üst köşedeki proje seçiciye tıklayın
+   - "New Project" butonuna tıklayın
+   - Proje adı girin (örn: "SubWatch AI")
+   - "Create" butonuna tıklayın
+
+#### 2. Gmail API'yi Etkinleştirme
+
+1. Sol menüden "APIs & Services" > "Library" seçin
+2. "Gmail API" araması yapın
+3. Gmail API'yi seçin
+4. "Enable" butonuna tıklayın
+
+#### 3. OAuth 2.0 Credentials Oluşturma
+
+1. Sol menüden "APIs & Services" > "Credentials" seçin
+2. "Create Credentials" > "OAuth client ID" seçin
+3. Eğer OAuth consent screen yapılandırılmamışsa:
+   - "Configure Consent Screen" butonuna tıklayın
+   - "External" seçin (kişisel kullanım için)
+   - Uygulama adı girin: "SubWatch AI"
+   - Kullanıcı desteği email'i ekleyin
+   - Geliştirici iletişim email'i ekleyin
+   - "Save and Continue" tıklayın
+   - Scopes ekranında "Add or Remove Scopes" tıklayın
+   - `https://www.googleapis.com/auth/gmail.readonly` scope'unu ekleyin
+   - "Save and Continue" tıklayın
+   - Test users ekranında email adresinizi ekleyin
+   - "Save and Continue" tıklayın
+
+4. OAuth client ID oluşturmaya devam edin:
+   - Application type: "Web application" seçin
+   - Name: "SubWatch AI Web Client"
+   - Authorized redirect URIs ekleyin:
+     ```
+     https://auth.expo.io/@your-expo-username/subwatch-ai
+     exp://localhost:8081/--/oauth-redirect
+     ```
+   - "Create" butonuna tıklayın
+
+5. Client ID ve Client Secret'ı kaydedin (bir sonraki adımda kullanacaksınız)
+
+#### 4. Environment Variables'ı Ayarlama
+
+`.env` dosyanıza aşağıdaki değerleri ekleyin:
+
+```env
+# Google OAuth 2.0 Credentials
+GOOGLE_CLIENT_ID=YOUR_CLIENT_ID_HERE.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=YOUR_CLIENT_SECRET_HERE
+GMAIL_API_SCOPE=https://www.googleapis.com/auth/gmail.readonly
+```
+
+**⚠️ GÜVENLİK UYARISI:**
+- `GOOGLE_CLIENT_SECRET` değeri ÇOK GİZLİDİR!
+- Development ortamında client-side'da kullanılabilir ancak **Production'da MUTLAKA Firebase Functions veya backend kullanın**
+- Asla `.env` dosyasını Git'e commit etmeyin
+
+#### 5. Firebase Functions Kurulumu (Production için ÖNERİLİR)
+
+Production ortamında Google Client Secret'ı client-side'da saklamak GÜVENLİK RİSKİDİR. Firebase Functions kullanarak token exchange işlemini sunucu tarafında yapın:
+
+1. Firebase projenizi oluşturun: [Firebase Console](https://console.firebase.google.com)
+2. Functions'ı etkinleştirin:
+   ```bash
+   firebase init functions
+   ```
+
+3. `functions/index.js` dosyasına token exchange endpoint'i ekleyin:
+   ```javascript
+   const functions = require('firebase-functions');
+   const axios = require('axios');
+
+   exports.exchangeGoogleToken = functions.https.onCall(async (data, context) => {
+     const { code, redirectUri } = data;
+
+     try {
+       const response = await axios.post('https://oauth2.googleapis.com/token', {
+         code,
+         client_id: functions.config().google.client_id,
+         client_secret: functions.config().google.client_secret,
+         redirect_uri: redirectUri,
+         grant_type: 'authorization_code',
+       });
+
+       return response.data;
+     } catch (error) {
+       throw new functions.https.HttpsError('internal', error.message);
+     }
+   });
+   ```
+
+4. Firebase config'e secret'ları ekleyin:
+   ```bash
+   firebase functions:config:set google.client_id="YOUR_CLIENT_ID"
+   firebase functions:config:set google.client_secret="YOUR_CLIENT_SECRET"
+   ```
+
+5. Deploy edin:
+   ```bash
+   firebase deploy --only functions
+   ```
+
+6. `src/contexts/GmailContext.js` dosyasını güncelleyin ve Firebase Function'ı kullanacak şekilde değiştirin.
+
+### 🎯 Kullanım
+
+1. Uygulamayı açın
+2. Ana sayfadaki "Gmail Senkronizasyonu" kartını bulun
+3. "Google ile Giriş Yap" butonuna tıklayın
+4. Google hesabınızı seçin ve izinleri onaylayın
+5. "Abonelikleri Senkronize Et" butonuna tıklayın
+6. Bulunan abonelikleri gözden geçirin ve onaylayın
+
+### 📋 Desteklenen Servisler
+
+Gmail entegrasyonu şu servislerin maillerini otomatik olarak tanır:
+- ✅ Netflix
+- ✅ Spotify
+- ✅ YouTube Premium
+- ✅ Apple (iCloud, Apple Music, Apple TV+)
+- ✅ Adobe Creative Cloud
+- ✅ Amazon Prime
+- ✅ Microsoft 365
+
+**Not:** Yeni servisler eklemek için `src/utils/mailParser.js` dosyasını düzenleyin.
+
+### 🔒 Gizlilik ve Güvenlik
+
+- **Sadece Okuma İzni:** Uygulama Gmail'inizi sadece OKUYUR, asla mail göndermez veya silmez
+- **Güvenli Saklama:** OAuth token'ları Expo SecureStore'da güvenli şekilde saklanır
+- **Kullanıcı Onayı:** Tespit edilen abonelikler otomatik eklenmez, kullanıcı onayı gerektirir
+- **Minimal Scope:** Sadece `gmail.readonly` scope'u kullanılır
+
+### ⚠️ Sınırlamalar
+
+- Gmail API ücretsiz tier'da günlük **1 milyon** quota vardır (normal kullanım için fazlasıyla yeterli)
+- Mail parsing %80-90 doğrulukla çalışır (basit regex kullanır)
+- Sadece İngilizce ve Türkçe mailleri destekler
+- Eski mailleri tespit etmek için 50 mail limiti vardır (değiştirilebilir)
+
+### 🐛 Sorun Giderme
+
+**"OAuth redirect URI mismatch" hatası:**
+- Google Cloud Console'daki redirect URI'yi kontrol edin
+- Expo username'inizi doğru girdiğinizden emin olun
+
+**"Invalid client" hatası:**
+- Client ID ve Client Secret'ı kontrol edin
+- `.env` dosyasının doğru yüklendiğinden emin olun
+
+**Mail bulunamadı:**
+- Gmail hesabınızda ilgili servislerin maillerinin olduğundan emin olun
+- Spam klasörünü kontrol edin
+- Mail parser'ı geliştirmek için `src/utils/mailParser.js`'i düzenleyin
+
+---
+
 ## 🔌 API Dokümantasyonu
 
 ### Authentication

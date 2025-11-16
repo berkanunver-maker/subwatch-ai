@@ -23,17 +23,29 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSubscriptions } from '../contexts/SubscriptionContext';
+import { useGmail } from '../contexts/GmailContext';
+import { parseMultipleEmails } from '../utils/mailParser';
 import { spacing, borderRadius, fontSize, fontWeight } from '../config/theme';
 
 export default function HomeScreen({ navigation }) {
   const { theme, isDark, toggleTheme } = useTheme();
-  const { loading: subsLoading, getStatistics } = useSubscriptions();
+  const { loading: subsLoading, getStatistics, addSubscription } = useSubscriptions();
+  const {
+    user,
+    isAuthenticated,
+    loading: gmailLoading,
+    signInWithGoogle,
+    signOut,
+    fetchSubscriptionEmails,
+  } = useGmail();
 
   // State yönetimi
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [statistics, setStatistics] = useState({
     totalMonthly: 0,
     totalYearly: 0,
@@ -70,6 +82,114 @@ export default function HomeScreen({ navigation }) {
   const onRefresh = () => {
     setRefreshing(true);
     loadStatistics();
+  };
+
+  /**
+   * Gmail ile giriş yap
+   */
+  const handleGmailSignIn = async () => {
+    try {
+      await signInWithGoogle();
+      Alert.alert('Başarılı', 'Google hesabınıza başarıyla giriş yaptınız!');
+    } catch (error) {
+      console.error('Gmail giriş hatası:', error);
+      Alert.alert(
+        'Hata',
+        'Google ile giriş yapılamadı. Lütfen internet bağlantınızı kontrol edin.'
+      );
+    }
+  };
+
+  /**
+   * Gmail'den abonelikleri senkronize et
+   */
+  const handleSyncSubscriptions = async () => {
+    try {
+      setSyncing(true);
+
+      // Gmail'den subscription maillerini al
+      const emails = await fetchSubscriptionEmails();
+
+      if (!emails || emails.length === 0) {
+        Alert.alert('Bilgi', 'Abonelik maili bulunamadı.');
+        setSyncing(false);
+        return;
+      }
+
+      // Mail'leri parse et
+      const parsedSubscriptions = parseMultipleEmails(emails);
+
+      if (parsedSubscriptions.length === 0) {
+        Alert.alert(
+          'Bilgi',
+          `${emails.length} mail incelendi ancak abonelik bilgisi çıkarılamadı.`
+        );
+        setSyncing(false);
+        return;
+      }
+
+      // Kullanıcıya onay sor
+      Alert.alert(
+        'Abonelikler Bulundu',
+        `${parsedSubscriptions.length} abonelik tespit edildi. Eklemek ister misiniz?`,
+        [
+          { text: 'İptal', style: 'cancel', onPress: () => setSyncing(false) },
+          {
+            text: 'Ekle',
+            onPress: async () => {
+              try {
+                // Her birini ekle
+                for (const sub of parsedSubscriptions) {
+                  await addSubscription(sub);
+                }
+
+                Alert.alert(
+                  'Başarılı',
+                  `${parsedSubscriptions.length} abonelik başarıyla eklendi!`
+                );
+
+                // İstatistikleri güncelle
+                loadStatistics();
+              } catch (error) {
+                console.error('Abonelik ekleme hatası:', error);
+                Alert.alert('Hata', 'Abonelikler eklenirken bir hata oluştu.');
+              } finally {
+                setSyncing(false);
+              }
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Sync hatası:', error);
+      Alert.alert(
+        'Hata',
+        'Abonelikler senkronize edilirken bir hata oluştu. Lütfen tekrar deneyin.'
+      );
+      setSyncing(false);
+    }
+  };
+
+  /**
+   * Gmail'den çıkış yap
+   */
+  const handleGmailSignOut = async () => {
+    Alert.alert('Çıkış Yap', 'Google hesabınızdan çıkış yapmak istiyor musunuz?', [
+      { text: 'İptal', style: 'cancel' },
+      {
+        text: 'Çıkış Yap',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await signOut();
+            Alert.alert('Başarılı', 'Çıkış yapıldı.');
+          } catch (error) {
+            console.error('Çıkış hatası:', error);
+            Alert.alert('Hata', 'Çıkış yapılırken bir hata oluştu.');
+          }
+        },
+      },
+    ]);
   };
 
   // Dinamik stiller
@@ -135,6 +255,61 @@ export default function HomeScreen({ navigation }) {
       <View style={styles.card}>
         <Text style={styles.cardLabel}>Aktif Abonelikler</Text>
         <Text style={styles.cardValue}>{statistics.activeCount}</Text>
+      </View>
+
+      {/* Gmail Sync Card */}
+      <View style={[styles.card, styles.gmailCard]}>
+        <Text style={styles.gmailCardTitle}>📧 Gmail Senkronizasyonu</Text>
+
+        {!isAuthenticated ? (
+          <View>
+            <Text style={styles.gmailCardText}>
+              Gmail hesabınızdaki abonelik maillerini otomatik olarak tespit edin ve
+              ekleyin.
+            </Text>
+            <TouchableOpacity
+              style={styles.googleButton}
+              onPress={handleGmailSignIn}
+              disabled={gmailLoading}
+            >
+              {gmailLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.googleButtonIcon}>G</Text>
+                  <Text style={styles.googleButtonText}>Google ile Giriş Yap</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View>
+            <Text style={styles.gmailCardText}>
+              {user?.email || 'Giriş yapıldı'} • Bağlandı ✓
+            </Text>
+
+            <View style={styles.gmailActions}>
+              <TouchableOpacity
+                style={[styles.syncButton, syncing && styles.syncButtonDisabled]}
+                onPress={handleSyncSubscriptions}
+                disabled={syncing}
+              >
+                {syncing ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.syncButtonText}>🔄 Abonelikleri Senkronize Et</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.signOutButton}
+                onPress={handleGmailSignOut}
+              >
+                <Text style={styles.signOutButtonText}>Çıkış Yap</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Hızlı Aksiyonlar */}
@@ -322,5 +497,84 @@ const createStyles = (theme) =>
       fontSize: fontSize.sm,
       color: theme.textSecondary,
       lineHeight: 20,
+    },
+    gmailCard: {
+      backgroundColor: theme.mode === 'dark' ? 'rgba(99, 102, 241, 0.1)' : '#eef2ff',
+      borderLeftWidth: 4,
+      borderLeftColor: theme.primary,
+    },
+    gmailCardTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.bold,
+      color: theme.text,
+      marginBottom: spacing.md,
+    },
+    gmailCardText: {
+      fontSize: fontSize.sm,
+      color: theme.textSecondary,
+      marginBottom: spacing.lg,
+      lineHeight: 20,
+    },
+    googleButton: {
+      backgroundColor: '#4285F4',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: spacing.md,
+      borderRadius: borderRadius.md,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    googleButtonIcon: {
+      fontSize: fontSize.xl,
+      fontWeight: fontWeight.bold,
+      color: '#fff',
+      marginRight: spacing.sm,
+      backgroundColor: '#fff',
+      color: '#4285F4',
+      width: 28,
+      height: 28,
+      textAlign: 'center',
+      lineHeight: 28,
+      borderRadius: 4,
+    },
+    googleButtonText: {
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.semibold,
+      color: '#fff',
+    },
+    gmailActions: {
+      gap: spacing.md,
+    },
+    syncButton: {
+      backgroundColor: theme.primary,
+      padding: spacing.md,
+      borderRadius: borderRadius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 44,
+    },
+    syncButtonDisabled: {
+      opacity: 0.6,
+    },
+    syncButtonText: {
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.semibold,
+      color: '#fff',
+    },
+    signOutButton: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: theme.border,
+      padding: spacing.sm,
+      borderRadius: borderRadius.md,
+      alignItems: 'center',
+    },
+    signOutButtonText: {
+      fontSize: fontSize.sm,
+      color: theme.textSecondary,
     },
   });
