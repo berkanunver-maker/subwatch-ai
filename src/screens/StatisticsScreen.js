@@ -24,9 +24,12 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import api, { endpoints } from '../services/api';
+import { useTheme } from '../contexts/ThemeContext';
+import { spacing, borderRadius, fontSize, fontWeight } from '../config/theme';
 
 export default function StatisticsScreen() {
+  const { theme } = useTheme();
+
   // State yönetimi
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -40,18 +43,27 @@ export default function StatisticsScreen() {
 
   /**
    * İstatistikleri yükle
+   * TODO: Gerçek API entegrasyonu sonrası güncellenecek
    */
   const loadStatistics = async () => {
     try {
       setLoading(true);
 
-      // API'den istatistikleri al
-      const data = await api.get(endpoints.getStatistics);
-
-      setStatistics(data);
+      // Mock data (şimdilik)
+      // TODO: API call ve local storage'dan hesaplama eklenecek
+      setTimeout(() => {
+        setStatistics({
+          totalSpent: 0,
+          monthlyAverage: 0,
+          topSubscriptions: [],
+          categoryBreakdown: [],
+          savingsPotential: 0,
+        });
+        setLoading(false);
+        setRefreshing(false);
+      }, 500);
     } catch (error) {
       console.error('İstatistikler yüklenirken hata:', error);
-    } finally {
       setLoading(false);
       setRefreshing(false);
     }
@@ -72,11 +84,14 @@ export default function StatisticsScreen() {
     loadStatistics();
   };
 
+  // Dinamik stiller
+  const styles = createStyles(theme);
+
   // Yüklenme durumu
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#6366f1" />
+        <ActivityIndicator size="large" color={theme.primary} />
         <Text style={styles.loadingText}>Yükleniyor...</Text>
       </View>
     );
@@ -86,7 +101,12 @@ export default function StatisticsScreen() {
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={theme.primary}
+          colors={[theme.primary]}
+        />
       }
     >
       {/* Başlık */}
@@ -100,13 +120,15 @@ export default function StatisticsScreen() {
       {/* Toplam Harcama */}
       <View style={styles.card}>
         <Text style={styles.cardLabel}>Toplam Harcama (Bu Yıl)</Text>
-        <Text style={styles.largeValue}>₺{statistics.totalSpent}</Text>
+        <Text style={styles.largeValue}>₺{statistics.totalSpent.toFixed(2)}</Text>
       </View>
 
       {/* Aylık Ortalama */}
       <View style={styles.card}>
         <Text style={styles.cardLabel}>Aylık Ortalama</Text>
-        <Text style={styles.mediumValue}>₺{statistics.monthlyAverage}</Text>
+        <Text style={styles.mediumValue}>
+          ₺{statistics.monthlyAverage.toFixed(2)}
+        </Text>
       </View>
 
       {/* Tasarruf Potansiyeli */}
@@ -115,7 +137,7 @@ export default function StatisticsScreen() {
           <Text style={styles.savingsEmoji}>💰</Text>
           <Text style={styles.savingsTitle}>Tasarruf Potansiyeli</Text>
           <Text style={styles.savingsValue}>
-            ₺{statistics.savingsPotential} / ay
+            ₺{statistics.savingsPotential.toFixed(2)} / ay
           </Text>
           <Text style={styles.savingsText}>
             Kullanmadığınız abonelikleri iptal ederek bu kadar tasarruf
@@ -124,12 +146,23 @@ export default function StatisticsScreen() {
         </View>
       )}
 
-      {/* En Çok Harcanan Abonelikler */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>En Çok Harcanan Abonelikler</Text>
+      {/* Boş Durum - Henüz veri yok */}
+      {statistics.totalSpent === 0 && (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>📊</Text>
+          <Text style={styles.emptyTitle}>Henüz istatistik yok</Text>
+          <Text style={styles.emptyText}>
+            Abonelik ekledikçe harcama analizleriniz burada görünecek
+          </Text>
+        </View>
+      )}
 
-        {statistics.topSubscriptions.length > 0 ? (
-          statistics.topSubscriptions.map((sub, index) => (
+      {/* En Çok Harcanan Abonelikler */}
+      {statistics.topSubscriptions.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>En Çok Harcanan Abonelikler</Text>
+
+          {statistics.topSubscriptions.map((sub, index) => (
             <View key={index} style={styles.listItem}>
               <View style={styles.listItemInfo}>
                 <Text style={styles.listItemName}>{sub.name}</Text>
@@ -138,41 +171,39 @@ export default function StatisticsScreen() {
               <View
                 style={[
                   styles.listItemBar,
-                  { width: `${(sub.price / statistics.monthlyAverage) * 50}%` },
+                  {
+                    width: `${
+                      (sub.price / statistics.monthlyAverage) * 50
+                    }%`,
+                  },
                 ]}
               />
             </View>
-          ))
-        ) : (
-          <Text style={styles.emptyText}>Henüz veri yok</Text>
-        )}
-      </View>
+          ))}
+        </View>
+      )}
 
       {/* Kategori Dağılımı */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Kategori Dağılımı</Text>
+      {statistics.categoryBreakdown.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Kategori Dağılımı</Text>
 
-        {statistics.categoryBreakdown.length > 0 ? (
-          statistics.categoryBreakdown.map((category, index) => (
+          {statistics.categoryBreakdown.map((category, index) => (
             <View key={index} style={styles.categoryItem}>
               <Text style={styles.categoryName}>{category.name}</Text>
               <Text style={styles.categoryAmount}>₺{category.amount}</Text>
             </View>
-          ))
-        ) : (
-          <Text style={styles.emptyText}>Henüz veri yok</Text>
-        )}
-      </View>
+          ))}
+        </View>
+      )}
 
-      {/* AI Önerileri */}
+      {/* AI Önerileri Placeholder */}
       <View style={[styles.card, styles.aiCard]}>
         <Text style={styles.aiTitle}>🤖 AI Önerileri</Text>
         <Text style={styles.aiText}>
-          • Netflix aboneliğinizi son 30 gündür kullanmıyorsunuz. İptal
-          etmeyi düşünebilirsiniz.{'\n\n'}
-          • Spotify'da Family plan'e geçerek aylık ₺20 tasarruf
-          edebilirsiniz.{'\n\n'}
-          • Adobe Creative Cloud için daha uygun alternatifler mevcut.
+          {statistics.totalSpent === 0
+            ? 'Abonelik ekledikçe AI size kişiselleştirilmiş tasarruf önerileri sunacak.'
+            : 'AI analizleriniz yakında eklenecek. Kullanım verilerinizi analiz ederek size özel öneriler sunulacak.'}
         </Text>
       </View>
 
@@ -180,8 +211,9 @@ export default function StatisticsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Aylık Harcama Grafiği</Text>
         <View style={styles.chartPlaceholder}>
+          <Text style={styles.chartPlaceholderIcon}>📈</Text>
           <Text style={styles.chartPlaceholderText}>
-            📊 Grafik yakında eklenecek
+            Grafik yakında eklenecek
           </Text>
           <Text style={styles.chartPlaceholderSubtext}>
             Aylık harcama trendlerinizi burada görebileceksiniz
@@ -192,187 +224,210 @@ export default function StatisticsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
-  },
-  header: {
-    backgroundColor: '#6366f1',
-    padding: 20,
-    paddingTop: 60,
-    paddingBottom: 30,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 5,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#e0e7ff',
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginHorizontal: 15,
-    marginTop: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cardLabel: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 8,
-  },
-  largeValue: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  mediumValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#6366f1',
-  },
-  savingsCard: {
-    backgroundColor: '#ecfdf5',
-    borderLeftWidth: 4,
-    borderLeftColor: '#10b981',
-  },
-  savingsEmoji: {
-    fontSize: 48,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  savingsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#065f46',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  savingsValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#10b981',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  savingsText: {
-    fontSize: 14,
-    color: '#047857',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  section: {
-    marginTop: 20,
-    marginHorizontal: 15,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 15,
-  },
-  listItem: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
-  },
-  listItemInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  listItemName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  listItemPrice: {
-    fontSize: 16,
-    color: '#6366f1',
-    fontWeight: '600',
-  },
-  listItemBar: {
-    height: 6,
-    backgroundColor: '#6366f1',
-    borderRadius: 3,
-  },
-  categoryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
-  },
-  categoryName: {
-    fontSize: 16,
-    color: '#1f2937',
-  },
-  categoryAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#6366f1',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#9ca3af',
-    textAlign: 'center',
-    padding: 20,
-  },
-  aiCard: {
-    backgroundColor: '#f0f9ff',
-    borderLeftWidth: 4,
-    borderLeftColor: '#3b82f6',
-  },
-  aiTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e40af',
-    marginBottom: 12,
-  },
-  aiText: {
-    fontSize: 14,
-    color: '#1e3a8a',
-    lineHeight: 22,
-  },
-  chartPlaceholder: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 200,
-  },
-  chartPlaceholderText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#6b7280',
-    marginBottom: 8,
-  },
-  chartPlaceholderSubtext: {
-    fontSize: 14,
-    color: '#9ca3af',
-    textAlign: 'center',
-  },
-});
+/**
+ * Dinamik stil oluşturma fonksiyonu
+ */
+const createStyles = (theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    centerContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.background,
+    },
+    loadingText: {
+      marginTop: spacing.md,
+      fontSize: fontSize.md,
+      color: theme.textSecondary,
+    },
+    header: {
+      backgroundColor: theme.primary,
+      padding: spacing.xl,
+      paddingTop: 60,
+      paddingBottom: spacing.xxxl,
+    },
+    headerTitle: {
+      fontSize: fontSize.xxxl,
+      fontWeight: fontWeight.bold,
+      color: '#fff',
+      marginBottom: spacing.xs,
+    },
+    headerSubtitle: {
+      fontSize: fontSize.sm,
+      color: 'rgba(255, 255, 255, 0.8)',
+    },
+    card: {
+      backgroundColor: theme.backgroundCard,
+      borderRadius: borderRadius.lg,
+      padding: spacing.xl,
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.lg,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: theme.shadowOpacity,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    cardLabel: {
+      fontSize: fontSize.sm,
+      color: theme.textSecondary,
+      marginBottom: spacing.sm,
+    },
+    largeValue: {
+      fontSize: fontSize.display,
+      fontWeight: fontWeight.bold,
+      color: theme.text,
+    },
+    mediumValue: {
+      fontSize: fontSize.xxxl,
+      fontWeight: fontWeight.bold,
+      color: theme.primary,
+    },
+    savingsCard: {
+      backgroundColor: theme.mode === 'dark' ? 'rgba(16, 185, 129, 0.1)' : '#ecfdf5',
+      borderLeftWidth: 4,
+      borderLeftColor: theme.success,
+    },
+    savingsEmoji: {
+      fontSize: 48,
+      textAlign: 'center',
+      marginBottom: spacing.md,
+    },
+    savingsTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.bold,
+      color: theme.mode === 'dark' ? theme.success : '#065f46',
+      textAlign: 'center',
+      marginBottom: spacing.sm,
+    },
+    savingsValue: {
+      fontSize: fontSize.xxxl,
+      fontWeight: fontWeight.bold,
+      color: theme.success,
+      textAlign: 'center',
+      marginBottom: spacing.md,
+    },
+    savingsText: {
+      fontSize: fontSize.sm,
+      color: theme.mode === 'dark' ? theme.textSecondary : '#047857',
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      paddingVertical: 60,
+      paddingHorizontal: spacing.xl,
+    },
+    emptyIcon: {
+      fontSize: 64,
+      marginBottom: spacing.lg,
+    },
+    emptyTitle: {
+      fontSize: fontSize.xl,
+      fontWeight: fontWeight.bold,
+      color: theme.text,
+      marginBottom: spacing.sm,
+    },
+    emptyText: {
+      fontSize: fontSize.md,
+      color: theme.textSecondary,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    section: {
+      marginTop: spacing.xl,
+      marginHorizontal: spacing.lg,
+    },
+    sectionTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.bold,
+      color: theme.text,
+      marginBottom: spacing.lg,
+    },
+    listItem: {
+      backgroundColor: theme.backgroundCard,
+      borderRadius: borderRadius.md,
+      padding: spacing.lg,
+      marginBottom: spacing.md,
+    },
+    listItemInfo: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: spacing.sm,
+    },
+    listItemName: {
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.semibold,
+      color: theme.text,
+    },
+    listItemPrice: {
+      fontSize: fontSize.md,
+      color: theme.primary,
+      fontWeight: fontWeight.semibold,
+    },
+    listItemBar: {
+      height: 6,
+      backgroundColor: theme.primary,
+      borderRadius: borderRadius.sm,
+    },
+    categoryItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      backgroundColor: theme.backgroundCard,
+      borderRadius: borderRadius.md,
+      padding: spacing.lg,
+      marginBottom: spacing.md,
+    },
+    categoryName: {
+      fontSize: fontSize.md,
+      color: theme.text,
+    },
+    categoryAmount: {
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.bold,
+      color: theme.primary,
+    },
+    aiCard: {
+      backgroundColor: theme.mode === 'dark' ? 'rgba(59, 130, 246, 0.1)' : '#f0f9ff',
+      borderLeftWidth: 4,
+      borderLeftColor: theme.info,
+    },
+    aiTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.bold,
+      color: theme.mode === 'dark' ? theme.info : '#1e40af',
+      marginBottom: spacing.md,
+    },
+    aiText: {
+      fontSize: fontSize.sm,
+      color: theme.mode === 'dark' ? theme.textSecondary : '#1e3a8a',
+      lineHeight: 22,
+    },
+    chartPlaceholder: {
+      backgroundColor: theme.backgroundCard,
+      borderRadius: borderRadius.lg,
+      padding: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 200,
+    },
+    chartPlaceholderIcon: {
+      fontSize: 48,
+      marginBottom: spacing.md,
+    },
+    chartPlaceholderText: {
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.bold,
+      color: theme.text,
+      marginBottom: spacing.sm,
+    },
+    chartPlaceholderSubtext: {
+      fontSize: fontSize.sm,
+      color: theme.textSecondary,
+      textAlign: 'center',
+    },
+  });

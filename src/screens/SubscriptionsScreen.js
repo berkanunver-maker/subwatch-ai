@@ -25,9 +25,12 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import api, { endpoints } from '../services/api';
+import { useTheme } from '../contexts/ThemeContext';
+import { spacing, borderRadius, fontSize, fontWeight } from '../config/theme';
 
 export default function SubscriptionsScreen({ navigation }) {
+  const { theme } = useTheme();
+
   // State yönetimi
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -36,20 +39,21 @@ export default function SubscriptionsScreen({ navigation }) {
 
   /**
    * Abonelikleri yükle
+   * TODO: Gerçek API entegrasyonu sonrası güncellenecek
    */
   const loadSubscriptions = async () => {
     try {
       setLoading(true);
 
-      // API'den abonelikleri al
-      // NOT: Gerçek backend hazır olana kadar mock data kullanıyoruz
-      const data = await api.get(endpoints.subscriptions);
-
-      setSubscriptions(data || []);
+      // Mock data (şimdilik boş)
+      // TODO: API call ve local storage'dan okuma eklenecek
+      setTimeout(() => {
+        setSubscriptions([]);
+        setLoading(false);
+        setRefreshing(false);
+      }, 500);
     } catch (error) {
       console.error('Abonelikler yüklenirken hata:', error);
-      Alert.alert('Hata', 'Abonelikler yüklenirken bir hata oluştu.');
-    } finally {
       setLoading(false);
       setRefreshing(false);
     }
@@ -69,9 +73,9 @@ export default function SubscriptionsScreen({ navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await api.delete(endpoints.deleteSubscription(id));
+              // TODO: Local storage'dan silme işlemi eklenecek
               Alert.alert('Başarılı', 'Abonelik silindi.');
-              loadSubscriptions(); // Listeyi yenile
+              loadSubscriptions();
             } catch (error) {
               console.error('Abonelik silinirken hata:', error);
               Alert.alert('Hata', 'Abonelik silinirken bir hata oluştu.');
@@ -111,67 +115,73 @@ export default function SubscriptionsScreen({ navigation }) {
    */
   const renderSubscriptionItem = ({ item }) => (
     <TouchableOpacity
-      style={styles.subscriptionCard}
+      style={styles(theme).subscriptionCard}
       onPress={() => {
         // Detay sayfasına git
         console.log('Detay:', item.id);
       }}
     >
-      <View style={styles.subscriptionInfo}>
-        <Text style={styles.subscriptionName}>{item.name}</Text>
-        <Text style={styles.subscriptionPrice}>
+      <View style={styles(theme).subscriptionInfo}>
+        <Text style={styles(theme).subscriptionName}>{item.name}</Text>
+        <Text style={styles(theme).subscriptionPrice}>
           ₺{item.price} / {item.billingCycle === 'monthly' ? 'Aylık' : 'Yıllık'}
         </Text>
-        <Text style={styles.subscriptionDate}>
+        <Text style={styles(theme).subscriptionDate}>
           Yenileme: {new Date(item.nextBillingDate).toLocaleDateString('tr-TR')}
         </Text>
       </View>
 
-      <View style={styles.subscriptionActions}>
+      <View style={styles(theme).subscriptionActions}>
         <TouchableOpacity
-          style={styles.deleteButton}
+          style={styles(theme).deleteButton}
           onPress={() => deleteSubscription(item.id)}
         >
-          <Text style={styles.deleteButtonText}>Sil</Text>
+          <Text style={styles(theme).deleteButtonText}>Sil</Text>
         </TouchableOpacity>
       </View>
 
       {/* Aktif/Pasif Badge */}
       <View
         style={[
-          styles.badge,
-          item.isActive ? styles.activeBadge : styles.inactiveBadge,
+          styles(theme).badge,
+          item.isActive ? styles(theme).activeBadge : styles(theme).inactiveBadge,
         ]}
       >
-        <Text style={styles.badgeText}>
+        <Text style={styles(theme).badgeText}>
           {item.isActive ? 'Aktif' : 'Pasif'}
         </Text>
       </View>
     </TouchableOpacity>
   );
 
+  // Dinamik stiller
+  const dynamicStyles = styles(theme);
+
   // Yüklenme durumu
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#6366f1" />
-        <Text style={styles.loadingText}>Yükleniyor...</Text>
+      <View style={dynamicStyles.centerContainer}>
+        <ActivityIndicator size="large" color={theme.primary} />
+        <Text style={dynamicStyles.loadingText}>Yükleniyor...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       {/* Filtreler */}
-      <View style={styles.filterContainer}>
+      <View style={dynamicStyles.filterContainer}>
         <TouchableOpacity
-          style={[styles.filterButton, filter === 'all' && styles.activeFilter]}
+          style={[
+            dynamicStyles.filterButton,
+            filter === 'all' && dynamicStyles.activeFilter,
+          ]}
           onPress={() => setFilter('all')}
         >
           <Text
             style={[
-              styles.filterText,
-              filter === 'all' && styles.activeFilterText,
+              dynamicStyles.filterText,
+              filter === 'all' && dynamicStyles.activeFilterText,
             ]}
           >
             Tümü
@@ -180,15 +190,15 @@ export default function SubscriptionsScreen({ navigation }) {
 
         <TouchableOpacity
           style={[
-            styles.filterButton,
-            filter === 'active' && styles.activeFilter,
+            dynamicStyles.filterButton,
+            filter === 'active' && dynamicStyles.activeFilter,
           ]}
           onPress={() => setFilter('active')}
         >
           <Text
             style={[
-              styles.filterText,
-              filter === 'active' && styles.activeFilterText,
+              dynamicStyles.filterText,
+              filter === 'active' && dynamicStyles.activeFilterText,
             ]}
           >
             Aktif
@@ -197,15 +207,15 @@ export default function SubscriptionsScreen({ navigation }) {
 
         <TouchableOpacity
           style={[
-            styles.filterButton,
-            filter === 'inactive' && styles.activeFilter,
+            dynamicStyles.filterButton,
+            filter === 'inactive' && dynamicStyles.activeFilter,
           ]}
           onPress={() => setFilter('inactive')}
         >
           <Text
             style={[
-              styles.filterText,
-              filter === 'inactive' && styles.activeFilterText,
+              dynamicStyles.filterText,
+              filter === 'inactive' && dynamicStyles.activeFilterText,
             ]}
           >
             Pasif
@@ -218,14 +228,20 @@ export default function SubscriptionsScreen({ navigation }) {
         data={filteredSubscriptions}
         renderItem={renderSubscriptionItem}
         keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={dynamicStyles.listContainer}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.primary}
+            colors={[theme.primary]}
+          />
         }
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Henüz abonelik eklemediniz</Text>
-            <Text style={styles.emptySubtext}>
+          <View style={dynamicStyles.emptyContainer}>
+            <Text style={dynamicStyles.emptyIcon}>📭</Text>
+            <Text style={dynamicStyles.emptyText}>Henüz abonelik eklemediniz</Text>
+            <Text style={dynamicStyles.emptySubtext}>
               Yeni abonelik eklemek için + butonuna tıklayın
             </Text>
           </View>
@@ -234,164 +250,173 @@ export default function SubscriptionsScreen({ navigation }) {
 
       {/* Yeni Abonelik Ekle Butonu */}
       <TouchableOpacity
-        style={styles.fab}
+        style={dynamicStyles.fab}
         onPress={() => {
           // Yeni abonelik ekleme sayfasına git
-          console.log('Yeni abonelik ekle');
+          console.log('Yeni abonelik ekle - Form modal açılacak');
         }}
       >
-        <Text style={styles.fabText}>+</Text>
+        <Text style={dynamicStyles.fabText}>+</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    padding: 15,
-    gap: 10,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  filterButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 8,
-    backgroundColor: '#f3f4f6',
-    alignItems: 'center',
-  },
-  activeFilter: {
-    backgroundColor: '#6366f1',
-  },
-  filterText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-  activeFilterText: {
-    color: '#fff',
-  },
-  listContainer: {
-    padding: 15,
-  },
-  subscriptionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    position: 'relative',
-  },
-  subscriptionInfo: {
-    marginBottom: 10,
-  },
-  subscriptionName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 5,
-  },
-  subscriptionPrice: {
-    fontSize: 16,
-    color: '#6366f1',
-    marginBottom: 5,
-  },
-  subscriptionDate: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  subscriptionActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  deleteButton: {
-    backgroundColor: '#ef4444',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 6,
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  badge: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-  },
-  activeBadge: {
-    backgroundColor: '#10b981',
-  },
-  inactiveBadge: {
-    backgroundColor: '#6b7280',
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#6366f1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  fabText: {
-    fontSize: 32,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-});
+/**
+ * Dinamik stil oluşturma fonksiyonu
+ */
+const styles = (theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    centerContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.background,
+    },
+    loadingText: {
+      marginTop: spacing.md,
+      fontSize: fontSize.md,
+      color: theme.textSecondary,
+    },
+    filterContainer: {
+      flexDirection: 'row',
+      padding: spacing.lg,
+      gap: spacing.md,
+      backgroundColor: theme.backgroundCard,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    filterButton: {
+      flex: 1,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      borderRadius: borderRadius.md,
+      backgroundColor: theme.background,
+      alignItems: 'center',
+    },
+    activeFilter: {
+      backgroundColor: theme.primary,
+    },
+    filterText: {
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.semibold,
+      color: theme.textSecondary,
+    },
+    activeFilterText: {
+      color: '#fff',
+    },
+    listContainer: {
+      padding: spacing.lg,
+      flexGrow: 1,
+    },
+    subscriptionCard: {
+      backgroundColor: theme.backgroundCard,
+      borderRadius: borderRadius.lg,
+      padding: spacing.lg,
+      marginBottom: spacing.lg,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: theme.shadowOpacity,
+      shadowRadius: 4,
+      elevation: 3,
+      position: 'relative',
+    },
+    subscriptionInfo: {
+      marginBottom: spacing.md,
+    },
+    subscriptionName: {
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.bold,
+      color: theme.text,
+      marginBottom: spacing.xs,
+    },
+    subscriptionPrice: {
+      fontSize: fontSize.md,
+      color: theme.primary,
+      marginBottom: spacing.xs,
+    },
+    subscriptionDate: {
+      fontSize: fontSize.sm,
+      color: theme.textSecondary,
+    },
+    subscriptionActions: {
+      flexDirection: 'row',
+      gap: spacing.md,
+    },
+    deleteButton: {
+      backgroundColor: theme.error,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: borderRadius.sm,
+    },
+    deleteButtonText: {
+      color: '#fff',
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.semibold,
+    },
+    badge: {
+      position: 'absolute',
+      top: spacing.lg,
+      right: spacing.lg,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+      borderRadius: borderRadius.lg,
+    },
+    activeBadge: {
+      backgroundColor: theme.success,
+    },
+    inactiveBadge: {
+      backgroundColor: theme.textLight,
+    },
+    badgeText: {
+      color: '#fff',
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.semibold,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: 80,
+    },
+    emptyIcon: {
+      fontSize: 64,
+      marginBottom: spacing.lg,
+    },
+    emptyText: {
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.bold,
+      color: theme.text,
+      marginBottom: spacing.sm,
+    },
+    emptySubtext: {
+      fontSize: fontSize.sm,
+      color: theme.textSecondary,
+      textAlign: 'center',
+    },
+    fab: {
+      position: 'absolute',
+      bottom: spacing.xl,
+      right: spacing.xl,
+      width: 60,
+      height: 60,
+      borderRadius: borderRadius.round,
+      backgroundColor: theme.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 6,
+      elevation: 8,
+    },
+    fabText: {
+      fontSize: fontSize.display,
+      color: '#fff',
+      fontWeight: fontWeight.bold,
+    },
+  });
