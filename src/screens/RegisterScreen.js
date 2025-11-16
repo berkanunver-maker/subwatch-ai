@@ -92,11 +92,12 @@ export default function RegisterScreen({ navigation }) {
     try {
       await signUpWithEmail(email, password, name.trim());
       Alert.alert(
-        'Kayıt Başarılı',
-        'Hesabınız oluşturuldu! Şimdi aboneliklerinizi eklemeye başlayabilirsiniz.',
+        'Kayıt Başarılı! 🎉',
+        `Email doğrulama linki ${email} adresine gönderildi.\n\nLütfen gelen kutunuzu kontrol edin ve email adresinizi doğrulayın.`,
         [{ text: 'Tamam' }]
       );
       // Navigation otomatik olarak AuthContext tarafından yapılacak
+      // Email verification screen gösterilecek
     } catch (error) {
       let errorMessage = 'Kayıt olunamadı. Lütfen tekrar deneyin.';
 

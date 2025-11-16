@@ -169,6 +169,14 @@ nano .env  # veya istediğiniz editör
      ```
    - Bu değerleri `.env` dosyasına ekleyin (FIREBASE_* değişkenleri)
 
+   e. **Firestore Security Rules ekleyin (ÇOK ÖNEMLİ!)** ⚠️
+   - Sol menüden "Firestore Database" > "Rules" tab'ına gidin
+   - Projedeki `firestore.rules` dosyasının içeriğini kopyalayın
+   - Firebase Console'daki Rules editörüne yapıştırın
+   - "Publish" butonuna tıklayın
+
+   **UYARI:** Bu adım yapılmazsa VERİLERİNİZ HERKESE AÇIK OLUR! ⚠️
+
 5. **Uygulamayı başlatın**
 ```bash
 npm start

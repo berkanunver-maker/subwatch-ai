@@ -35,6 +35,7 @@ import { useAuth } from '../contexts/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import EmailVerificationScreen from '../screens/EmailVerificationScreen';
 
 // Main Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -158,10 +159,10 @@ function AuthStack() {
 
 /**
  * Root Navigator
- * Auth durumuna göre AuthStack veya TabNavigator gösterir
+ * Auth durumuna göre AuthStack, EmailVerification veya TabNavigator gösterir
  */
 export default function AppNavigator() {
-  const { user, initializing } = useAuth();
+  const { user, initializing, emailVerified } = useAuth();
   const { theme } = useTheme();
 
   // Auth kontrolü yapılıyorsa loading göster
@@ -173,11 +174,23 @@ export default function AppNavigator() {
     );
   }
 
-  return (
-    <NavigationContainer>
-      {user ? <TabNavigator /> : <AuthStack />}
-    </NavigationContainer>
-  );
+  // Kullanıcı durumuna göre ekran göster
+  const getScreen = () => {
+    if (!user) {
+      // Kullanıcı giriş yapmamış → Login/Register
+      return <AuthStack />;
+    }
+
+    // Email/Password ile giriş yapıp email doğrulanmamışsa → Verification
+    if (user.email && !emailVerified && user.authProvider !== 'google') {
+      return <EmailVerificationScreen />;
+    }
+
+    // Her şey tamam → Ana uygulama
+    return <TabNavigator />;
+  };
+
+  return <NavigationContainer>{getScreen()}</NavigationContainer>;
 }
 
 /**

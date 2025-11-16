@@ -21,6 +21,7 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
+  sendEmailVerification,
   updateProfile,
   GoogleAuthProvider,
   signInWithCredential,
@@ -49,6 +50,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [initializing, setInitializing] = useState(true);
+  const [emailVerified, setEmailVerified] = useState(false);
 
   /**
    * Firebase auth state değişikliklerini dinle
@@ -56,6 +58,9 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        // Email verification durumunu kontrol et
+        setEmailVerified(firebaseUser.emailVerified);
+
         // Kullanıcı bilgilerini Firestore'dan al
         const userData = await getUserData(firebaseUser.uid);
         setUser({
@@ -63,10 +68,12 @@ export function AuthProvider({ children }) {
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           photoURL: firebaseUser.photoURL,
+          emailVerified: firebaseUser.emailVerified,
           ...userData,
         });
       } else {
         setUser(null);
+        setEmailVerified(false);
       }
 
       if (initializing) {
@@ -132,12 +139,17 @@ export function AuthProvider({ children }) {
         await updateProfile(userCredential.user, { displayName });
       }
 
+      // Email doğrulama maili gönder
+      await sendEmailVerification(userCredential.user);
+      console.log('✅ Email doğrulama maili gönderildi:', email);
+
       // Firestore'a kullanıcı bilgilerini kaydet
       await saveUserData(userCredential.user.uid, {
         email,
         displayName: displayName || '',
         createdAt: new Date().toISOString(),
         authProvider: 'email',
+        emailVerified: false,
       });
 
       return userCredential.user;
@@ -223,6 +235,59 @@ export function AuthProvider({ children }) {
   };
 
   /**
+   * Email doğrulama maili tekrar gönder
+   */
+  const resendVerificationEmail = async () => {
+    try {
+      if (!auth.currentUser) {
+        throw new Error('Kullanıcı giriş yapmamış');
+      }
+
+      if (auth.currentUser.emailVerified) {
+        throw new Error('Email zaten doğrulanmış');
+      }
+
+      setLoading(true);
+      await sendEmailVerification(auth.currentUser);
+      console.log('✅ Email doğrulama maili tekrar gönderildi');
+    } catch (error) {
+      console.error('Email doğrulama maili gönderme hatası:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Email doğrulama durumunu kontrol et (manuel refresh)
+   */
+  const checkEmailVerification = async () => {
+    try {
+      if (!auth.currentUser) {
+        throw new Error('Kullanıcı giriş yapmamış');
+      }
+
+      // Firebase'den güncel kullanıcı bilgisini çek
+      await auth.currentUser.reload();
+      const isVerified = auth.currentUser.emailVerified;
+
+      setEmailVerified(isVerified);
+
+      // Firestore'da güncelle
+      if (isVerified && user) {
+        await saveUserData(user.uid, {
+          emailVerified: true,
+        });
+      }
+
+      return isVerified;
+    } catch (error) {
+      console.error('Email doğrulama kontrolü hatası:', error);
+      throw error;
+    }
+  };
+
+  /**
    * Kullanıcı profil güncelle
    */
   const updateUserProfile = async (updates) => {
@@ -284,10 +349,13 @@ export function AuthProvider({ children }) {
     user,
     loading,
     initializing,
+    emailVerified,
     signUpWithEmail,
     signInWithEmail,
     signInWithGoogle,
     resetPassword,
+    resendVerificationEmail,
+    checkEmailVerification,
     updateUserProfile,
     signOut,
   };
