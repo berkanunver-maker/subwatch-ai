@@ -6,10 +6,12 @@
  * Abonelik verilerini global olarak yöneten Context API
  *
  * ÖZELLİKLER:
- * - AsyncStorage ile kalıcı veri saklama
+ * - Firebase Firestore ile cloud storage
+ * - Real-time updates (onSnapshot listeners)
+ * - Kullanıcı bazlı veri saklama
  * - CRUD işlemleri (Create, Read, Update, Delete)
  * - İstatistik hesaplamaları
- * - Filtreleme ve sıralama
+ * - Local -> Cloud migration
  *
  * KULLANIM:
  * import { useSubscriptions } from './contexts/SubscriptionContext';
@@ -20,6 +22,20 @@
 
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  onSnapshot,
+  getDocs,
+  setDoc,
+} from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { useAuth } from './AuthContext';
 
 const STORAGE_KEY = '@subwatch_subscriptions';
 
@@ -34,6 +50,7 @@ const SubscriptionContext = createContext({
   deleteSubscription: () => {},
   getStatistics: () => {},
   loadSampleData: () => {},
+  migrateToCloud: () => {},
 });
 
 /**
@@ -41,31 +58,26 @@ const SubscriptionContext = createContext({
  */
 const SAMPLE_SUBSCRIPTIONS = [
   {
-    id: '1',
     name: 'Netflix',
     price: 149.99,
     currency: 'TRY',
     billingCycle: 'monthly', // 'monthly' | 'yearly'
     category: 'streaming',
-    nextBillingDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(), // 15 gün sonra
+    nextBillingDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
     isActive: true,
-    createdAt: new Date().toISOString(),
     notes: 'Premium plan',
   },
   {
-    id: '2',
     name: 'Spotify',
     price: 59.99,
     currency: 'TRY',
     billingCycle: 'monthly',
     category: 'music',
-    nextBillingDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 gün sonra
+    nextBillingDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     isActive: true,
-    createdAt: new Date().toISOString(),
     notes: 'Premium Individual',
   },
   {
-    id: '3',
     name: 'YouTube Premium',
     price: 89.99,
     currency: 'TRY',
@@ -73,11 +85,9 @@ const SAMPLE_SUBSCRIPTIONS = [
     category: 'streaming',
     nextBillingDate: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
     isActive: true,
-    createdAt: new Date().toISOString(),
     notes: '',
   },
   {
-    id: '4',
     name: 'Adobe Creative Cloud',
     price: 699.99,
     currency: 'TRY',
@@ -85,11 +95,9 @@ const SAMPLE_SUBSCRIPTIONS = [
     category: 'productivity',
     nextBillingDate: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString(),
     isActive: true,
-    createdAt: new Date().toISOString(),
     notes: 'All Apps plan',
   },
   {
-    id: '5',
     name: 'iCloud',
     price: 29.99,
     currency: 'TRY',
@@ -97,7 +105,6 @@ const SAMPLE_SUBSCRIPTIONS = [
     category: 'storage',
     nextBillingDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
     isActive: true,
-    createdAt: new Date().toISOString(),
     notes: '200GB plan',
   },
 ];
@@ -106,69 +113,100 @@ const SAMPLE_SUBSCRIPTIONS = [
  * Subscription Provider Component
  */
 export const SubscriptionProvider = ({ children }) => {
+  const { user } = useAuth();
   const [subscriptions, setSubscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [unsubscribe, setUnsubscribe] = useState(null);
 
   /**
-   * Uygulama başladığında abonelikleri yükle
+   * Kullanıcı değiştiğinde abonelikleri yükle
    */
   useEffect(() => {
-    loadSubscriptions();
-  }, []);
+    if (user) {
+      // Kullanıcı giriş yapmışsa Firestore'dan dinle
+      setupFirestoreListener();
+    } else {
+      // Kullanıcı çıkış yapmışsa listener'ı temizle
+      if (unsubscribe) {
+        unsubscribe();
+        setUnsubscribe(null);
+      }
+      setSubscriptions([]);
+      setLoading(false);
+    }
+
+    // Cleanup
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [user]);
 
   /**
-   * AsyncStorage'dan abonelikleri yükle
+   * Firestore real-time listener kurulumu
    */
-  const loadSubscriptions = async () => {
+  const setupFirestoreListener = () => {
     try {
       setLoading(true);
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
 
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setSubscriptions(parsed);
-      } else {
-        // İlk kullanım - örnek verileri yükle
-        console.log('📦 İlk kullanım - örnek abonelikler yükleniyor...');
-        await saveSubscriptions(SAMPLE_SUBSCRIPTIONS);
-        setSubscriptions(SAMPLE_SUBSCRIPTIONS);
-      }
+      // Kullanıcıya ait abonelikler collection'ı
+      const subscriptionsRef = collection(db, 'users', user.uid, 'subscriptions');
+
+      // Real-time listener
+      const unsubscribeFn = onSnapshot(
+        subscriptionsRef,
+        async (snapshot) => {
+          const subs = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+
+          setSubscriptions(subs);
+
+          // İlk kullanımdaysa ve abonelik yoksa örnek verileri yükle
+          if (snapshot.empty) {
+            console.log('📦 İlk kullanım - örnek abonelikler yükleniyor...');
+            await loadSampleData();
+          } else {
+            setLoading(false);
+          }
+        },
+        (error) => {
+          console.error('Firestore listener hatası:', error);
+          setLoading(false);
+        }
+      );
+
+      setUnsubscribe(() => unsubscribeFn);
     } catch (error) {
-      console.error('Abonelikler yüklenirken hata:', error);
-    } finally {
+      console.error('Firestore listener kurulumu hatası:', error);
       setLoading(false);
     }
   };
 
   /**
-   * Abonelikleri AsyncStorage'a kaydet
-   */
-  const saveSubscriptions = async (data) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (error) {
-      console.error('Abonelikler kaydedilirken hata:', error);
-      throw error;
-    }
-  };
-
-  /**
-   * Yeni abonelik ekle
+   * Yeni abonelik ekle (Firestore)
    */
   const addSubscription = async (subscription) => {
+    if (!user) {
+      throw new Error('Kullanıcı giriş yapmamış');
+    }
+
     try {
+      const subscriptionsRef = collection(db, 'users', user.uid, 'subscriptions');
+
       const newSubscription = {
         ...subscription,
-        id: Date.now().toString(), // Basit ID oluşturma
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         isActive: subscription.isActive ?? true,
       };
 
-      const updated = [...subscriptions, newSubscription];
-      await saveSubscriptions(updated);
-      setSubscriptions(updated);
+      const docRef = await addDoc(subscriptionsRef, newSubscription);
 
-      return newSubscription;
+      console.log('✅ Abonelik eklendi:', docRef.id);
+      return { id: docRef.id, ...newSubscription };
     } catch (error) {
       console.error('Abonelik eklenirken hata:', error);
       throw error;
@@ -176,16 +214,22 @@ export const SubscriptionProvider = ({ children }) => {
   };
 
   /**
-   * Abonelik güncelle
+   * Abonelik güncelle (Firestore)
    */
   const updateSubscription = async (id, updates) => {
-    try {
-      const updated = subscriptions.map((sub) =>
-        sub.id === id ? { ...sub, ...updates } : sub
-      );
+    if (!user) {
+      throw new Error('Kullanıcı giriş yapmamış');
+    }
 
-      await saveSubscriptions(updated);
-      setSubscriptions(updated);
+    try {
+      const docRef = doc(db, 'users', user.uid, 'subscriptions', id);
+
+      await updateDoc(docRef, {
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      });
+
+      console.log('✅ Abonelik güncellendi:', id);
     } catch (error) {
       console.error('Abonelik güncellenirken hata:', error);
       throw error;
@@ -193,13 +237,18 @@ export const SubscriptionProvider = ({ children }) => {
   };
 
   /**
-   * Abonelik sil
+   * Abonelik sil (Firestore)
    */
   const deleteSubscription = async (id) => {
+    if (!user) {
+      throw new Error('Kullanıcı giriş yapmamış');
+    }
+
     try {
-      const updated = subscriptions.filter((sub) => sub.id !== id);
-      await saveSubscriptions(updated);
-      setSubscriptions(updated);
+      const docRef = doc(db, 'users', user.uid, 'subscriptions', id);
+      await deleteDoc(docRef);
+
+      console.log('✅ Abonelik silindi:', id);
     } catch (error) {
       console.error('Abonelik silinirken hata:', error);
       throw error;
@@ -272,25 +321,103 @@ export const SubscriptionProvider = ({ children }) => {
       categoryBreakdown: Object.values(categoryBreakdown),
       upcomingRenewals,
       monthlyAverage: totalMonthly,
-      totalSpent: totalYearly, // Bu yıl için (basitleştirilmiş)
+      totalSpent: totalYearly,
       savingsPotential: 0, // AI analizi ile hesaplanacak
     };
   };
 
   /**
-   * Örnek verileri yükle (debug için)
+   * Örnek verileri yükle (Firestore)
    */
   const loadSampleData = async () => {
-    await saveSubscriptions(SAMPLE_SUBSCRIPTIONS);
-    setSubscriptions(SAMPLE_SUBSCRIPTIONS);
+    if (!user) {
+      console.warn('Kullanıcı giriş yapmamış');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      for (const sub of SAMPLE_SUBSCRIPTIONS) {
+        await addSubscription(sub);
+      }
+
+      console.log('✅ Örnek veriler yüklendi');
+    } catch (error) {
+      console.error('Örnek veri yükleme hatası:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Local AsyncStorage'dan Cloud Firestore'a migration
+   * (Eski kullanıcılar için)
+   */
+  const migrateToCloud = async () => {
+    if (!user) {
+      throw new Error('Kullanıcı giriş yapmamış');
+    }
+
+    try {
+      setLoading(true);
+
+      // Local storage'dan oku
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+
+      if (!stored) {
+        console.log('📦 Local storage\'da veri yok');
+        return;
+      }
+
+      const localSubs = JSON.parse(stored);
+
+      if (localSubs.length === 0) {
+        console.log('📦 Local storage boş');
+        return;
+      }
+
+      console.log(`🔄 ${localSubs.length} abonelik Cloud'a taşınıyor...`);
+
+      // Firestore'a taşı
+      for (const sub of localSubs) {
+        // ID'yi kaldır (Firestore yeni ID oluşturacak)
+        const { id, ...subData } = sub;
+        await addSubscription(subData);
+      }
+
+      // Local storage'ı temizle
+      await AsyncStorage.removeItem(STORAGE_KEY);
+
+      console.log('✅ Migration tamamlandı!');
+    } catch (error) {
+      console.error('Migration hatası:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   /**
    * Tüm verileri temizle (debug için)
    */
   const clearAllData = async () => {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-    setSubscriptions([]);
+    if (!user) {
+      return;
+    }
+
+    try {
+      const subscriptionsRef = collection(db, 'users', user.uid, 'subscriptions');
+      const snapshot = await getDocs(subscriptionsRef);
+
+      const deletePromises = snapshot.docs.map((doc) => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+
+      console.log('✅ Tüm veriler temizlendi');
+    } catch (error) {
+      console.error('Veri temizleme hatası:', error);
+      throw error;
+    }
   };
 
   const value = {
@@ -302,6 +429,7 @@ export const SubscriptionProvider = ({ children }) => {
     getStatistics,
     loadSampleData,
     clearAllData,
+    migrateToCloud,
   };
 
   return (
