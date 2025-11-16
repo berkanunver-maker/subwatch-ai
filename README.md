@@ -23,11 +23,20 @@
 
 ## ✨ Özellikler
 
+### 🔐 Kullanıcı Yönetimi
+- ✅ Google Sign-In (OAuth 2.0)
+- ✅ Email/Password ile kayıt ve giriş
+- ✅ Şifre sıfırlama
+- ✅ Firebase Authentication entegrasyonu
+- ✅ Güvenli token yönetimi
+- ✅ Çoklu cihaz desteği
+
 ### 📊 Abonelik Yönetimi
 - ✅ Aylık/Yıllık abonelikleri kolayca ekleyin, düzenleyin ve silin
 - ✅ Aktif ve pasif abonelikleri filtreleyin
 - ✅ Yenileme tarihlerini ve ücretleri takip edin
 - ✅ Otomatik ödeme durumunu yönetin
+- ✅ Gmail API ile otomatik abonelik tespiti
 
 ### 🤖 AI Destekli Özellikler
 - ✅ **Akıllı Analiz**: AI ile kullanmadığınız abonelikleri tespit edin
@@ -119,7 +128,48 @@ nano .env  # veya istediğiniz editör
 
 **ÖNEMLİ:** `.env` dosyasındaki tüm placeholder değerleri gerçek bilgilerle değiştirin!
 
-4. **Uygulamayı başlatın**
+4. **Firebase Kurulumu** (Authentication ve Firestore için)
+
+   a. Firebase projesi oluşturun:
+   - [Firebase Console](https://console.firebase.google.com)'a gidin
+   - "Add project" butonuna tıklayın
+   - Proje adı girin (örn: "SubWatch AI")
+   - Google Analytics'i enable/disable edin (isteğe bağlı)
+   - "Create project" butonuna tıklayın
+
+   b. Firebase Authentication'ı etkinleştirin:
+   - Sol menüden "Build" > "Authentication" seçin
+   - "Get Started" butonuna tıklayın
+   - "Sign-in method" tab'ına gidin
+   - "Email/Password" provider'ını enable edin
+   - "Google" provider'ını enable edin ve Web SDK configuration kopyalayın
+
+   c. Cloud Firestore'u etkinleştirin:
+   - Sol menüden "Build" > "Firestore Database" seçin
+   - "Create database" butonuna tıklayın
+   - "Start in production mode" seçin (şimdilik)
+   - Location seçin ve "Enable" butonuna tıklayın
+
+   d. Web uygulaması ekleyin ve config alın:
+   - Sol menüden "Project Overview" > "Project settings"
+   - "Your apps" bölümünde "Add app" > Web icon (</>) seçin
+   - App nickname girin (örn: "SubWatch AI Web")
+   - "Register app" butonuna tıklayın
+   - Firebase config değerlerini kopyalayın:
+     ```javascript
+     const firebaseConfig = {
+       apiKey: "...",
+       authDomain: "...",
+       projectId: "...",
+       storageBucket: "...",
+       messagingSenderId: "...",
+       appId: "...",
+       measurementId: "..." // İsteğe bağlı
+     };
+     ```
+   - Bu değerleri `.env` dosyasına ekleyin (FIREBASE_* değişkenleri)
+
+5. **Uygulamayı başlatın**
 ```bash
 npm start
 # veya
