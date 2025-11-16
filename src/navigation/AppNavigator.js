@@ -41,6 +41,8 @@ import EmailVerificationScreen from '../screens/EmailVerificationScreen';
 import HomeScreen from '../screens/HomeScreen';
 import SubscriptionsScreen from '../screens/SubscriptionsScreen';
 import StatisticsScreen from '../screens/StatisticsScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -118,6 +120,32 @@ function TabNavigator() {
           headerShown: false, // Custom header kullanıyoruz
           // tabBarIcon: ({ color, size }) => (
           //   <Icon name="bar-chart" size={size} color={color} />
+          // ),
+        }}
+      />
+
+      {/* Profil */}
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          tabBarLabel: 'Profil',
+          headerTitle: 'Profilim',
+          // tabBarIcon: ({ color, size }) => (
+          //   <Icon name="user" size={size} color={color} />
+          // ),
+        }}
+      />
+
+      {/* Ayarlar */}
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          tabBarLabel: 'Ayarlar',
+          headerTitle: 'Ayarlar',
+          // tabBarIcon: ({ color, size }) => (
+          //   <Icon name="settings" size={size} color={color} />
           // ),
         }}
       />
