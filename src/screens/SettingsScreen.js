@@ -25,12 +25,17 @@ import {
   ScrollView,
   Switch,
   Alert,
+  Share,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSubscriptions } from '../contexts/SubscriptionContext';
 import { spacing, borderRadius, fontSize, fontWeight } from '../config/theme';
+import { ENV } from '../config/env';
 
 export default function SettingsScreen() {
   const { theme, isDarkMode, toggleTheme } = useTheme();
+  const { subscriptions } = useSubscriptions();
 
   // Settings state (placeholder for future implementation)
   const [notifications, setNotifications] = useState({
@@ -109,15 +114,33 @@ export default function SettingsScreen() {
   const handleClearCache = () => {
     Alert.alert(
       'Önbelleği Temizle',
-      'Önbelleği temizlemek istediğinizden emin misiniz? Bu işlem geri alınamaz.',
+      'Geçici dosyalar ve önbellek verileri silinecek. Devam etmek istiyor musunuz?',
       [
         { text: 'İptal', style: 'cancel' },
         {
           text: 'Temizle',
           style: 'destructive',
-          onPress: () => {
-            // TODO: Implement cache clearing
-            Alert.alert('Başarılı', 'Önbellek temizlendi');
+          onPress: async () => {
+            try {
+              // AsyncStorage'dan gereksiz verileri temizle
+              // (Tema, dil, bildirim ayarları gibi önemli ayarları koruyoruz)
+              const keysToKeep = ['app-theme', 'app-language', 'app-currency', 'app-notifications'];
+              const allKeys = await AsyncStorage.getAllKeys();
+              const keysToRemove = allKeys.filter(key => !keysToKeep.includes(key));
+
+              if (keysToRemove.length > 0) {
+                await AsyncStorage.multiRemove(keysToRemove);
+              }
+
+              if (ENV.DEBUG_MODE) {
+                console.log(`✅ ${keysToRemove.length} önbellek anahtarı temizlendi`);
+              }
+
+              Alert.alert('Başarılı', `Önbellek temizlendi (${keysToRemove.length} öğe silindi)`);
+            } catch (error) {
+              console.error('Önbellek temizleme hatası:', error);
+              Alert.alert('Hata', 'Önbellek temizlenirken bir hata oluştu');
+            }
           },
         },
       ]
@@ -127,21 +150,46 @@ export default function SettingsScreen() {
   /**
    * Verileri dışa aktar
    */
-  const handleExportData = () => {
-    Alert.alert(
-      'Verileri Dışa Aktar',
-      'Abonelik verileriniz JSON formatında dışa aktarılacak.',
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Dışa Aktar',
-          onPress: () => {
-            // TODO: Implement data export
-            Alert.alert('Bilgi', 'Veri dışa aktarma özelliği yakında eklenecek');
-          },
-        },
-      ]
-    );
+  const handleExportData = async () => {
+    try {
+      if (!subscriptions || subscriptions.length === 0) {
+        Alert.alert('Bilgi', 'Dışa aktarılacak abonelik bulunamadı');
+        return;
+      }
+
+      // JSON formatında veri hazırla
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        version: '1.0.0',
+        totalSubscriptions: subscriptions.length,
+        subscriptions: subscriptions.map(sub => ({
+          name: sub.name,
+          price: sub.price,
+          currency: sub.currency,
+          billingCycle: sub.billingCycle,
+          nextBillingDate: sub.nextBillingDate,
+          isActive: sub.isActive,
+          category: sub.category,
+          description: sub.description || '',
+          createdAt: sub.createdAt,
+        })),
+      };
+
+      const jsonString = JSON.stringify(exportData, null, 2);
+
+      // Share API ile paylaş
+      await Share.share({
+        message: jsonString,
+        title: 'SubWatch AI - Abonelik Verileri',
+      });
+
+      if (ENV.DEBUG_MODE) {
+        console.log('✅ Veri dışa aktarıldı:', exportData.totalSubscriptions, 'abonelik');
+      }
+    } catch (error) {
+      console.error('Veri dışa aktarma hatası:', error);
+      Alert.alert('Hata', 'Veriler dışa aktarılırken bir hata oluştu');
+    }
   };
 
   /**

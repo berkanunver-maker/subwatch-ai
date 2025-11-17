@@ -40,12 +40,50 @@ import EmailVerificationScreen from '../screens/EmailVerificationScreen';
 // Main Screens
 import HomeScreen from '../screens/HomeScreen';
 import SubscriptionsScreen from '../screens/SubscriptionsScreen';
+import SubscriptionDetailScreen from '../screens/SubscriptionDetailScreen';
 import StatisticsScreen from '../screens/StatisticsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
+
+/**
+ * Subscriptions Stack Navigator
+ * Subscriptions ve SubscriptionDetail ekranları
+ */
+function SubscriptionsStack() {
+  const { theme } = useTheme();
+
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: theme.primary,
+        },
+        headerTintColor: '#fff',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+      }}
+    >
+      <Stack.Screen
+        name="SubscriptionsList"
+        component={SubscriptionsScreen}
+        options={{
+          headerTitle: 'Aboneliklerim',
+        }}
+      />
+      <Stack.Screen
+        name="SubscriptionDetail"
+        component={SubscriptionDetailScreen}
+        options={{
+          headerTitle: 'Abonelik Detayı',
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
 
 /**
  * Bottom Tab Navigator
@@ -100,10 +138,10 @@ function TabNavigator() {
       {/* Abonelikler */}
       <Tab.Screen
         name="Subscriptions"
-        component={SubscriptionsScreen}
+        component={SubscriptionsStack}
         options={{
           tabBarLabel: 'Abonelikler',
-          headerTitle: 'Aboneliklerim',
+          headerShown: false, // Stack navigator kendi header'ını gösterir
           // tabBarIcon: ({ color, size }) => (
           //   <Icon name="list" size={size} color={color} />
           // ),
