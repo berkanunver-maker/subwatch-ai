@@ -32,7 +32,7 @@ import { parseMultipleEmails } from '../utils/mailParser';
 import { spacing, borderRadius, fontSize, fontWeight } from '../config/theme';
 
 export default function HomeScreen({ navigation }) {
-  const { theme, isDark, toggleTheme } = useTheme();
+  const { theme, isDarkMode, toggleTheme } = useTheme();
   const { loading: subsLoading, getStatistics, addSubscription } = useSubscriptions();
   const {
     user,
@@ -480,7 +480,7 @@ const createStyles = (theme) =>
       color: '#fff',
     },
     infoBox: {
-      backgroundColor: isDark => (isDark ? 'rgba(251, 191, 36, 0.1)' : '#fffbeb'),
+      backgroundColor: theme.mode === 'dark' ? 'rgba(251, 191, 36, 0.1)' : '#fffbeb',
       borderRadius: borderRadius.lg,
       padding: spacing.lg,
       margin: spacing.lg,

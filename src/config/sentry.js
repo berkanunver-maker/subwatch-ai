@@ -23,7 +23,7 @@
  * ==============================================================================
  */
 
-import * as Sentry from '@sentry/react-native';
+import * as Sentry from 'sentry-expo';
 import { ENV } from './env';
 import { SENTRY, APP } from './constants';
 

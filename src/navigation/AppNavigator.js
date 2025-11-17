@@ -248,7 +248,7 @@ export default function AppNavigator() {
     }
 
     // Email/Password ile giriş yapıp email doğrulanmamışsa → Verification
-    if (user.email && !emailVerified && user.authProvider !== 'google') {
+    if (user.email && !emailVerified && user.authProvider && user.authProvider !== 'google') {
       return <EmailVerificationScreen />;
     }
 
