@@ -35,14 +35,55 @@ import { useAuth } from '../contexts/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import EmailVerificationScreen from '../screens/EmailVerificationScreen';
 
 // Main Screens
 import HomeScreen from '../screens/HomeScreen';
 import SubscriptionsScreen from '../screens/SubscriptionsScreen';
+import SubscriptionDetailScreen from '../screens/SubscriptionDetailScreen';
 import StatisticsScreen from '../screens/StatisticsScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
+
+/**
+ * Subscriptions Stack Navigator
+ * Subscriptions ve SubscriptionDetail ekranları
+ */
+function SubscriptionsStack() {
+  const { theme } = useTheme();
+
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: theme.primary,
+        },
+        headerTintColor: '#fff',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+      }}
+    >
+      <Stack.Screen
+        name="SubscriptionsList"
+        component={SubscriptionsScreen}
+        options={{
+          headerTitle: 'Aboneliklerim',
+        }}
+      />
+      <Stack.Screen
+        name="SubscriptionDetail"
+        component={SubscriptionDetailScreen}
+        options={{
+          headerTitle: 'Abonelik Detayı',
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
 
 /**
  * Bottom Tab Navigator
@@ -97,10 +138,10 @@ function TabNavigator() {
       {/* Abonelikler */}
       <Tab.Screen
         name="Subscriptions"
-        component={SubscriptionsScreen}
+        component={SubscriptionsStack}
         options={{
           tabBarLabel: 'Abonelikler',
-          headerTitle: 'Aboneliklerim',
+          headerShown: false, // Stack navigator kendi header'ını gösterir
           // tabBarIcon: ({ color, size }) => (
           //   <Icon name="list" size={size} color={color} />
           // ),
@@ -117,6 +158,32 @@ function TabNavigator() {
           headerShown: false, // Custom header kullanıyoruz
           // tabBarIcon: ({ color, size }) => (
           //   <Icon name="bar-chart" size={size} color={color} />
+          // ),
+        }}
+      />
+
+      {/* Profil */}
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          tabBarLabel: 'Profil',
+          headerTitle: 'Profilim',
+          // tabBarIcon: ({ color, size }) => (
+          //   <Icon name="user" size={size} color={color} />
+          // ),
+        }}
+      />
+
+      {/* Ayarlar */}
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          tabBarLabel: 'Ayarlar',
+          headerTitle: 'Ayarlar',
+          // tabBarIcon: ({ color, size }) => (
+          //   <Icon name="settings" size={size} color={color} />
           // ),
         }}
       />
@@ -158,10 +225,10 @@ function AuthStack() {
 
 /**
  * Root Navigator
- * Auth durumuna göre AuthStack veya TabNavigator gösterir
+ * Auth durumuna göre AuthStack, EmailVerification veya TabNavigator gösterir
  */
 export default function AppNavigator() {
-  const { user, initializing } = useAuth();
+  const { user, initializing, emailVerified } = useAuth();
   const { theme } = useTheme();
 
   // Auth kontrolü yapılıyorsa loading göster
@@ -173,11 +240,23 @@ export default function AppNavigator() {
     );
   }
 
-  return (
-    <NavigationContainer>
-      {user ? <TabNavigator /> : <AuthStack />}
-    </NavigationContainer>
-  );
+  // Kullanıcı durumuna göre ekran göster
+  const getScreen = () => {
+    if (!user) {
+      // Kullanıcı giriş yapmamış → Login/Register
+      return <AuthStack />;
+    }
+
+    // Email/Password ile giriş yapıp email doğrulanmamışsa → Verification
+    if (user.email && !emailVerified && user.authProvider !== 'google') {
+      return <EmailVerificationScreen />;
+    }
+
+    // Her şey tamam → Ana uygulama
+    return <TabNavigator />;
+  };
+
+  return <NavigationContainer>{getScreen()}</NavigationContainer>;
 }
 
 /**

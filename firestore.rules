@@ -1,0 +1,98 @@
+rules_version = '2';
+
+/**
+ * ==============================================================================
+ * FIRESTORE SECURITY RULES - SUBWATCH AI
+ * ==============================================================================
+ *
+ * Bu dosya Firebase Firestore'un güvenlik kurallarını tanımlar.
+ *
+ * KURULUM:
+ * 1. Firebase Console'a gidin: https://console.firebase.google.com
+ * 2. Projenizi seçin
+ * 3. Sol menüden "Firestore Database" > "Rules" sekmesine gidin
+ * 4. Bu dosyanın içeriğini kopyalayıp yapıştırın
+ * 5. "Publish" butonuna tıklayın
+ *
+ * GÜVENLİK:
+ * - Kullanıcılar sadece kendi verilerine erişebilir
+ * - Authentication zorunludur
+ * - Veri validasyonu yapılır
+ * ==============================================================================
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================================
+    // KULLANICI VERİLERİ
+    // ============================================================================
+
+    /**
+     * Kullanıcı profil bilgileri
+     * Path: /users/{userId}
+     */
+    match /users/{userId} {
+      // Sadece giriş yapmış kullanıcı kendi profilini okuyabilir/yazabilir
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+
+      // Veri validasyonu
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.data.keys().hasAll(['email', 'createdAt'])
+                   && request.resource.data.email is string
+                   && request.resource.data.email.size() > 0;
+    }
+
+    // ============================================================================
+    // ABONELİKLER
+    // ============================================================================
+
+    /**
+     * Kullanıcı abonelikleri
+     * Path: /users/{userId}/subscriptions/{subscriptionId}
+     */
+    match /users/{userId}/subscriptions/{subscriptionId} {
+      // Sadece sahibi okuyabilir/yazabilir
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId
+                    && validateSubscription(request.resource.data);
+      allow update: if request.auth != null && request.auth.uid == userId
+                    && validateSubscription(request.resource.data);
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ============================================================================
+    // HELPER FUNCTIONS
+    // ============================================================================
+
+    /**
+     * Abonelik verisi validasyonu
+     */
+    function validateSubscription(data) {
+      return data.keys().hasAll(['name', 'price', 'currency', 'billingCycle', 'isActive'])
+          && data.name is string
+          && data.name.size() > 0
+          && data.name.size() <= 100
+          && data.price is number
+          && data.price >= 0
+          && data.price <= 999999
+          && data.currency is string
+          && data.currency.size() == 3  // ISO 4217 (TRY, USD, EUR)
+          && data.billingCycle in ['monthly', 'yearly']
+          && data.isActive is bool;
+    }
+
+    // ============================================================================
+    // DİĞER COLLECTİONLAR İÇİN VARSAYILAN: ERİŞİM YOK
+    // ============================================================================
+
+    // Tanımlanmamış path'lere erişim engellenir
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

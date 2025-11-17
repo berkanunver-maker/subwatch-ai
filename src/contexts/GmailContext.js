@@ -11,6 +11,7 @@
  * - Gmail API ile mail okuma (gmail.readonly scope)
  * - Abonelik maillerini otomatik tespit
  * - Token yenileme (refresh token)
+ * - Retry logic (infinite loop önleme)
  * ==============================================================================
  */
 
@@ -20,17 +21,13 @@ import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
 import axios from 'axios';
 import { ENV } from '../config/env';
+import { GMAIL, STORAGE_KEYS } from '../config/constants';
 
 // OAuth 2.0 completion için gerekli
 WebBrowser.maybeCompleteAuthSession();
 
 // Context oluştur
 const GmailContext = createContext();
-
-// Secure storage keys
-const GMAIL_TOKEN_KEY = 'gmail_access_token';
-const GMAIL_REFRESH_TOKEN_KEY = 'gmail_refresh_token';
-const GMAIL_EXPIRY_KEY = 'gmail_token_expiry';
 
 /**
  * Gmail Provider Component
@@ -52,8 +49,8 @@ export function GmailProvider({ children }) {
    */
   const checkExistingToken = async () => {
     try {
-      const accessToken = await SecureStore.getItemAsync(GMAIL_TOKEN_KEY);
-      const expiryStr = await SecureStore.getItemAsync(GMAIL_EXPIRY_KEY);
+      const accessToken = await SecureStore.getItemAsync(STORAGE_KEYS.GMAIL_TOKEN);
+      const expiryStr = await SecureStore.getItemAsync(STORAGE_KEYS.GMAIL_REFRESH);
 
       if (accessToken && expiryStr) {
         const expiry = parseInt(expiryStr, 10);
@@ -70,7 +67,9 @@ export function GmailProvider({ children }) {
         }
       }
     } catch (error) {
-      console.error('Token kontrolü hatası:', error);
+      if (ENV.DEBUG_MODE) {
+        console.error('Token kontrolü hatası:', error);
+      }
     } finally {
       setLoading(false);
     }
@@ -95,8 +94,10 @@ export function GmailProvider({ children }) {
       // OAuth 2.0 Authorization URL
       const authUrl = createAuthorizationUrl(redirectUri);
 
-      console.log('Opening OAuth URL:', authUrl);
-      console.log('Redirect URI:', redirectUri);
+      if (ENV.DEBUG_MODE) {
+        console.log('Opening OAuth URL:', authUrl);
+        console.log('Redirect URI:', redirectUri);
+      }
 
       // Web tarayıcısında OAuth sayfasını aç
       const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
@@ -113,7 +114,9 @@ export function GmailProvider({ children }) {
           throw new Error('Authorization code alınamadı');
         }
       } else {
-        console.log('OAuth iptal edildi veya başarısız oldu');
+        if (ENV.DEBUG_MODE) {
+          console.log('OAuth iptal edildi veya başarısız oldu');
+        }
       }
     } catch (error) {
       console.error('Google Sign-In hatası:', error);
@@ -131,7 +134,7 @@ export function GmailProvider({ children }) {
       client_id: ENV.GOOGLE_CLIENT_ID,
       redirect_uri: redirectUri,
       response_type: 'code',
-      scope: 'https://www.googleapis.com/auth/gmail.readonly email profile',
+      scope: GMAIL.SCOPES.join(' '),
       access_type: 'offline', // Refresh token almak için
       prompt: 'consent', // Her zaman onay ekranı göster
     });
@@ -192,11 +195,15 @@ export function GmailProvider({ children }) {
     try {
       const expiry = Date.now() + expiresIn * 1000;
 
-      await SecureStore.setItemAsync(GMAIL_TOKEN_KEY, accessToken);
+      await SecureStore.setItemAsync(STORAGE_KEYS.GMAIL_TOKEN, accessToken);
       if (refreshToken) {
-        await SecureStore.setItemAsync(GMAIL_REFRESH_TOKEN_KEY, refreshToken);
+        await SecureStore.setItemAsync(STORAGE_KEYS.GMAIL_REFRESH, refreshToken);
       }
-      await SecureStore.setItemAsync(GMAIL_EXPIRY_KEY, expiry.toString());
+      await SecureStore.setItemAsync('gmail_token_expiry', expiry.toString());
+
+      if (ENV.DEBUG_MODE) {
+        console.log('✅ Gmail tokens güvenli şekilde kaydedildi');
+      }
     } catch (error) {
       console.error('Token kaydetme hatası:', error);
       throw error;
@@ -208,10 +215,14 @@ export function GmailProvider({ children }) {
    */
   const refreshAccessToken = async () => {
     try {
-      const refreshToken = await SecureStore.getItemAsync(GMAIL_REFRESH_TOKEN_KEY);
+      const refreshToken = await SecureStore.getItemAsync(STORAGE_KEYS.GMAIL_REFRESH);
 
       if (!refreshToken) {
         throw new Error('Refresh token bulunamadı');
+      }
+
+      if (ENV.DEBUG_MODE) {
+        console.log('🔄 Gmail token yenileniyor...');
       }
 
       // DEVELOPMENT ONLY - Production'da Firebase Function kullanılacak
@@ -231,6 +242,10 @@ export function GmailProvider({ children }) {
       await fetchUserInfo(access_token);
 
       setIsAuthenticated(true);
+
+      if (ENV.DEBUG_MODE) {
+        console.log('✅ Gmail token başarıyla yenilendi');
+      }
     } catch (error) {
       console.error('Token yenileme hatası:', error);
       // Token yenilenemezse çıkış yap
@@ -265,10 +280,15 @@ export function GmailProvider({ children }) {
    *
    * @param {string} query - Gmail search query (örn: "from:netflix.com OR from:spotify.com")
    * @param {number} maxResults - Maksimum sonuç sayısı
+   * @param {number} retryCount - Retry counter (infinite loop önleme)
    */
-  const fetchSubscriptionEmails = async (query = '', maxResults = 50) => {
+  const fetchSubscriptionEmails = async (
+    query = '',
+    maxResults = GMAIL.MAX_RESULTS,
+    retryCount = 0
+  ) => {
     try {
-      const accessToken = await SecureStore.getItemAsync(GMAIL_TOKEN_KEY);
+      const accessToken = await SecureStore.getItemAsync(STORAGE_KEYS.GMAIL_TOKEN);
 
       if (!accessToken) {
         throw new Error('Giriş yapılmamış');
@@ -298,13 +318,19 @@ export function GmailProvider({ children }) {
 
       return detailedMessages;
     } catch (error) {
-      console.error('Mail çekme hatası:', error);
+      if (ENV.DEBUG_MODE) {
+        console.error('Mail çekme hatası:', error);
+      }
 
-      // Token süresi dolduysa yenile
-      if (error.response?.status === 401) {
+      // Token süresi dolduysa yenile (max retry ile infinite loop önleme)
+      if (error.response?.status === 401 && retryCount < GMAIL.MAX_RETRY) {
+        if (ENV.DEBUG_MODE) {
+          console.warn(`⚠️ 401 hatası, token yenileniyor... (Retry: ${retryCount + 1}/${GMAIL.MAX_RETRY})`);
+        }
+
         await refreshAccessToken();
-        // Tekrar dene
-        return fetchSubscriptionEmails(query, maxResults);
+        // Tekrar dene (retry counter artır)
+        return fetchSubscriptionEmails(query, maxResults, retryCount + 1);
       }
 
       throw error;
@@ -330,7 +356,9 @@ export function GmailProvider({ children }) {
 
       return response.data;
     } catch (error) {
-      console.error(`Mail detayı alma hatası (${messageId}):`, error);
+      if (ENV.DEBUG_MODE) {
+        console.error(`Mail detayı alma hatası (${messageId}):`, error);
+      }
       return null;
     }
   };
@@ -361,12 +389,16 @@ export function GmailProvider({ children }) {
   const signOut = async () => {
     try {
       // Token'ları sil
-      await SecureStore.deleteItemAsync(GMAIL_TOKEN_KEY);
-      await SecureStore.deleteItemAsync(GMAIL_REFRESH_TOKEN_KEY);
-      await SecureStore.deleteItemAsync(GMAIL_EXPIRY_KEY);
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.GMAIL_TOKEN);
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.GMAIL_REFRESH);
+      await SecureStore.deleteItemAsync('gmail_token_expiry');
 
       setUser(null);
       setIsAuthenticated(false);
+
+      if (ENV.DEBUG_MODE) {
+        console.log('✅ Gmail çıkış yapıldı');
+      }
     } catch (error) {
       console.error('Çıkış yapma hatası:', error);
     }

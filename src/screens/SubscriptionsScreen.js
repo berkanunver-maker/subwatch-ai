@@ -95,7 +95,7 @@ export default function SubscriptionsScreen({ navigation }) {
       style={styles(theme).subscriptionCard}
       onPress={() => {
         // Detay sayfasına git
-        console.log('Detay:', item.id);
+        navigation.navigate('SubscriptionDetail', { subscriptionId: item.id });
       }}
     >
       <View style={styles(theme).subscriptionInfo}>
