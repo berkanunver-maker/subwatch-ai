@@ -32,10 +32,14 @@ import { StatusBar } from 'expo-status-bar';
 import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { ENV } from './src/config/env';
+import { initializeSentry } from './src/config/sentry';
 import { ThemeProvider } from './src/contexts/ThemeContext';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { SubscriptionProvider } from './src/contexts/SubscriptionContext';
 import { GmailProvider } from './src/contexts/GmailContext';
+
+// Sentry'yi başlat (en üstte, diğer her şeyden önce)
+initializeSentry();
 
 export default function App() {
   /**

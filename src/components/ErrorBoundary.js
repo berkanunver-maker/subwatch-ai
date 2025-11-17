@@ -16,6 +16,8 @@
 
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { captureException } from '../config/sentry';
+import { ENV } from '../config/env';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -40,13 +42,16 @@ class ErrorBoundary extends React.Component {
       errorInfo,
     });
 
-    // Production'da hata loglama servisi kullan (örn: Sentry)
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    // Console'a yaz (development)
+    if (ENV.DEBUG_MODE) {
+      console.error('ErrorBoundary caught an error:', error, errorInfo);
+    }
 
-    // TODO: Sentry veya Firebase Crashlytics'e gönder
-    // if (ENV.isProduction()) {
-    //   Sentry.captureException(error, { extra: errorInfo });
-    // }
+    // Sentry'ye gönder (production)
+    captureException(error, {
+      componentStack: errorInfo?.componentStack,
+      errorBoundary: true,
+    });
   }
 
   /**
