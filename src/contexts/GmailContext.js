@@ -50,7 +50,7 @@ export function GmailProvider({ children }) {
   const checkExistingToken = async () => {
     try {
       const accessToken = await SecureStore.getItemAsync(STORAGE_KEYS.GMAIL_TOKEN);
-      const expiryStr = await SecureStore.getItemAsync(STORAGE_KEYS.GMAIL_REFRESH);
+      const expiryStr = await SecureStore.getItemAsync('gmail_token_expiry');
 
       if (accessToken && expiryStr) {
         const expiry = parseInt(expiryStr, 10);
